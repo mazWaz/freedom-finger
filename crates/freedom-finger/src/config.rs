@@ -116,4 +116,10 @@ mod tests {
         assert_eq!(Config::port_of(&dir), DEFAULT_PORT);
         fs::remove_dir_all(&dir).unwrap();
     }
+
+    #[test]
+    fn zona_waktu_ada_tanpa_zoneinfo_sistem() {
+        // Alpine/Docker minimal: tanpa ini server gagal start ("no time zone database configured")
+        assert!(jiff::tz::TimeZoneDatabase::bundled().get("Asia/Jakarta").is_ok());
+    }
 }
