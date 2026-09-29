@@ -1,7 +1,7 @@
 // Uji aturan rekap (PRD Feature 7, Recap rules): npm test
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DEFAULT_SCHEDULE, recap } from './hitung-rekap.js';
+import { DEFAULT_SCHEDULE, correctionScans, recap } from './hitung-rekap.js';
 
 // 2026-09-01 = Selasa
 const run = (scans, o = {}) =>
@@ -64,6 +64,18 @@ test('izin/sakit/cuti/dinas bukan alpa, walau ada scan; hari libur di dalam cuti
   const [c] = run([], { leaves: cuti, from: '2026-09-04', to: '2026-09-07' });
   assert.deepEqual(c.days.map((d) => d.status), ['cuti', 'libur', 'libur', 'cuti']);
   assert.equal(c.total.cuti, 2);
+});
+
+test('koreksi manual dihitung sebagai scan: lupa absen pulang menjadi pulang; di luar rentang diabaikan', () => {
+  const corrections = [
+    { pin: '1', date: '2026-09-01', time: '17:30', reason: 'lupa absen pulang' },
+    { pin: '1', date: '2026-09-02', time: '08:00', reason: 'di luar rentang' },
+  ];
+  assert.equal(day(['08:05:00']).noOut, true);
+  const extra = correctionScans(corrections, '2026-09-01', '2026-09-01');
+  assert.equal(extra.length, 1);
+  const [r] = run([['1', '2026-09-01 08:05:00']].concat(extra.map((s) => [s.pin, s.scan_date])));
+  assert.deepEqual([r.days[0].out, r.days[0].noOut, r.days[0].hours], [hm(17, 30), false, hm(9, 25)]);
 });
 
 test('hari ini dan sesudahnya belum dihitung', () => {

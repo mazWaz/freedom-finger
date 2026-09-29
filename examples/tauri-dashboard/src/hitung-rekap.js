@@ -17,6 +17,11 @@ export const DEFAULT_SCHEDULE = {
 
 export const LEAVE_KINDS = ['izin', 'sakit', 'cuti', 'dinas'];
 
+/** Koreksi absen `{pin, date, time: "hh:mm", reason}` di rentang -> scan untuk recap(), bertanda `manual`. */
+export const correctionScans = (corrections, from, to) => corrections
+  .filter((c) => from <= c.date && c.date <= to)
+  .map((c) => ({ pin: c.pin, scan_date: `${c.date} ${c.time}:00`, manual: true, reason: c.reason }));
+
 /** "hh:mm" (atau "YYYY-MM-DD hh:mm:ss" mulai indeks `at`) -> menit */
 export const minutes = (s, at = 0) => Number(s.slice(at, at + 2)) * 60 + Number(s.slice(at + 3, at + 5));
 const DAY_MS = 86_400_000;
@@ -26,7 +31,7 @@ export const weekday = (date) => new Date(`${date}T00:00:00Z`).getUTCDay();
 
 /**
  * @param {object} o
- * @param {{pin: string, scan_date: string}[]} o.scans  scan semua mesin ("YYYY-MM-DD hh:mm:ss")
+ * @param {{pin: string, scan_date: string}[]} o.scans  scan semua mesin ("YYYY-MM-DD hh:mm:ss"), plus correctionScans()
  * @param {string[]} o.pins  karyawan yang ikut rekap (juga yang tanpa scan: mereka alpa)
  * @param {typeof DEFAULT_SCHEDULE} o.schedule
  * @param {{date: string, note?: string}[]} [o.holidays]

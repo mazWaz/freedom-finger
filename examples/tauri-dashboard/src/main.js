@@ -5,12 +5,13 @@
 // selama PC mati, karena antrean kiriman mesin sendiri masuk pelan.
 import { $, api, bus, connect, devices, emit, listen, loadData, loadDevices, loadUsers } from './app.js';
 import * as hariIni from './hari-ini.js';
+import * as izin from './izin.js';
 import * as karyawan from './karyawan.js';
 import * as pengaturan from './pengaturan.js';
 import * as rekap from './rekap.js';
 import * as riwayat from './riwayat.js';
 
-const TABS = { 'hari-ini': hariIni, riwayat, rekap, karyawan, pengaturan };
+const TABS = { 'hari-ini': hariIni, riwayat, rekap, izin, karyawan, pengaturan };
 let active = 'hari-ini';
 
 function open(name) {

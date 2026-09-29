@@ -23,7 +23,7 @@
       th { color: var(--muted); font-weight: 500; }
       .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
       tr.klik { cursor: pointer; } tr.klik:hover, tr.klik:focus { background: var(--hover); outline: none; }
-      tr.alpa td { color: var(--off); } tr.libur td { color: var(--muted); }
+      tr.alpa td { color: var(--off); } tr.libur td { color: var(--muted); } tr.manual td { font-style: italic; }
       .tanpa-lembur .lembur { display: none; }
       .ok { color: var(--ok); } .off { color: var(--off); }
       tr.baru { animation: baru 2s; }
@@ -47,6 +47,7 @@
       <button role="tab" id="tab-hari-ini" aria-controls="hari-ini">Hari ini</button>
       <button role="tab" id="tab-riwayat" aria-controls="riwayat">Riwayat</button>
       <button role="tab" id="tab-rekap" aria-controls="rekap">Rekap</button>
+      <button role="tab" id="tab-izin" aria-controls="izin">Izin &amp; koreksi</button>
       <button role="tab" id="tab-karyawan" aria-controls="karyawan">Karyawan</button>
       <button role="tab" id="tab-pengaturan" aria-controls="pengaturan">Pengaturan</button>
     </nav>
@@ -83,7 +84,7 @@
       <p class="print-title" id="r-judul"></p>
       <p id="r-info" class="muted"></p>
       <table>
-        <thead><tr><th>Tanggal</th><th>Jam</th><th>Nama</th><th>PIN</th><th>Tombol mesin</th><th>Verifikasi</th><th>Mesin</th></tr></thead>
+        <thead><tr><th>Tanggal</th><th>Jam</th><th>Nama</th><th>PIN</th><th>Tombol mesin</th><th>Verifikasi</th><th>Mesin</th><th>Keterangan</th></tr></thead>
         <tbody id="r-daftar"></tbody>
       </table>
     </section>
@@ -116,6 +117,37 @@
           <tbody id="k-hari"></tbody>
         </table>
       </div>
+    </section>
+
+    <section id="izin" role="tabpanel" aria-labelledby="tab-izin" hidden>
+      <p class="muted">Catatan di tab ini hanya disimpan di aplikasi. Log absen di mesin tidak pernah diubah, supaya data asli tetap utuh sebagai bukti.</p>
+      <h2>Izin, sakit, cuti, dinas luar</h2>
+      <p class="muted">Hari kerja dengan catatan ini tidak dihitung alpa, walau ada scan.</p>
+      <form id="i-izin" class="controls">
+        <select name="pin" aria-label="Karyawan" required></select>
+        <select name="kind" aria-label="Jenis"></select>
+        <input type="date" name="from" aria-label="Dari tanggal" required /> –
+        <input type="date" name="to" aria-label="Sampai tanggal (kosong = satu hari)" title="Kosong = satu hari" />
+        <input name="note" placeholder="Keterangan" aria-label="Keterangan" size="30" />
+        <button name="simpan">Simpan</button> <button type="button" name="batal" hidden>Batal</button>
+      </form>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Nama</th><th>Jenis</th><th>Keterangan</th><th></th></tr></thead>
+        <tbody id="i-izin-daftar"></tbody>
+      </table>
+      <h2>Koreksi absen</h2>
+      <p class="muted">Untuk karyawan yang lupa scan. Koreksi dihitung di Rekap seperti scan biasa, dan tampil bertanda "manual" di Riwayat.</p>
+      <form id="i-koreksi" class="controls">
+        <select name="pin" aria-label="Karyawan" required></select>
+        <input type="date" name="date" aria-label="Tanggal" required />
+        <input type="time" name="time" aria-label="Jam" required />
+        <input name="reason" placeholder="Alasan (wajib), mis. lupa absen pulang" aria-label="Alasan" size="36" required />
+        <button name="simpan">Simpan</button> <button type="button" name="batal" hidden>Batal</button>
+      </form>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Jam</th><th>Nama</th><th>Alasan</th><th></th></tr></thead>
+        <tbody id="i-koreksi-daftar"></tbody>
+      </table>
     </section>
 
     <section id="karyawan" role="tabpanel" aria-labelledby="tab-karyawan" hidden>

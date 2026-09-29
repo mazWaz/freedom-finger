@@ -1,6 +1,7 @@
 // Tab Riwayat: semua scan dalam rentang tanggal, cari karyawan, pilih mesin, export dan cetak.
-import { $, devices, dmy, esc, exportCsv, exportXlsx, logs, nameOf, print, range, reportTitle } from './app.js';
-import { minutes } from './hitung-rekap.js';
+// Koreksi absen (izin.js) ikut tampil bertanda "manual" beserta alasannya, kecuali saat satu mesin dipilih.
+import { $, data, devices, dmy, esc, exportCsv, exportXlsx, logs, nameOf, print, range, reportTitle } from './app.js';
+import { correctionScans, minutes } from './hitung-rekap.js';
 import { STATUS, VERIFY } from './hari-ini.js';
 
 let rows = []; // hasil get_attlog untuk rentang terpilih, terbaru dulu
@@ -49,19 +50,30 @@ export async function show(reason) {
   render();
 }
 
-/** Baris yang cocok dengan pencarian nama atau PIN. */
-function visible() {
-  const q = $('r-cari').value.trim().toLowerCase();
-  return q ? rows.filter((l) => l.pin.includes(q) || nameOf(l.pin).toLowerCase().includes(q)) : rows;
+/** Scan mesin ditambah koreksi manual, terbaru dulu. */
+function all() {
+  if ($('r-mesin').value) return rows;
+  return [...rows, ...correctionScans(data.corrections, $('r-dari').value, $('r-sampai').value)].sort((a, b) => b.scan_date.localeCompare(a.scan_date));
 }
 
+/** Baris yang cocok dengan pencarian nama atau PIN. */
+function visible(list = all()) {
+  const q = $('r-cari').value.trim().toLowerCase();
+  return q ? list.filter((l) => l.pin.includes(q) || nameOf(l.pin).toLowerCase().includes(q)) : list;
+}
+
+const button = (l) => (l.manual ? '' : (STATUS[l.status_scan] ?? String(l.status_scan)));
+const verify = (l) => (l.manual ? 'Manual' : (VERIFY[l.verify] ?? String(l.verify)));
+
 function render() {
-  const list = visible();
-  $('r-info').textContent = `${list.length} scan${list.length === rows.length ? '' : ` dari ${rows.length}`}`;
+  const every = all();
+  const list = visible(every);
+  const manual = list.filter((l) => l.manual).length;
+  $('r-info').textContent = `${list.length} scan${list.length === every.length ? '' : ` dari ${every.length}`}${manual ? `, ${manual} di antaranya koreksi manual` : ''}`;
   $('r-daftar').innerHTML = list
-    .map((l) => `<tr><td>${dmy(l.scan_date.slice(0, 10))}</td><td>${l.scan_date.slice(11, 16)}</td><td>${esc(nameOf(l.pin))}</td>` +
-      `<td>${esc(l.pin)}</td><td>${STATUS[l.status_scan] ?? esc(l.status_scan)}</td><td>${VERIFY[l.verify] ?? esc(l.verify)}</td>` +
-      `<td>${esc(l.cloud_id)}</td></tr>`)
+    .map((l) => `<tr${l.manual ? ' class="manual"' : ''}><td>${dmy(l.scan_date.slice(0, 10))}</td><td>${l.scan_date.slice(11, 16)}</td>` +
+      `<td>${esc(nameOf(l.pin))}</td><td>${esc(l.pin)}</td><td>${esc(button(l))}</td><td>${esc(verify(l))}</td>` +
+      `<td>${esc(l.cloud_id)}</td><td>${esc(l.reason)}</td></tr>`)
     .join('');
 }
 
@@ -77,8 +89,8 @@ function table() {
       { title: 'Tombol mesin', kind: 'text', width: 13 },
       { title: 'Verifikasi', kind: 'text', width: 11 },
       { title: 'Mesin', kind: 'text', width: 20 },
+      { title: 'Keterangan', kind: 'text', width: 30 },
     ],
-    rows: visible().map((l) => [l.scan_date.slice(0, 10), minutes(l.scan_date, 11), nameOf(l.pin), l.pin,
-      STATUS[l.status_scan] ?? String(l.status_scan), VERIFY[l.verify] ?? String(l.verify), l.cloud_id]),
+    rows: visible().map((l) => [l.scan_date.slice(0, 10), minutes(l.scan_date, 11), nameOf(l.pin), l.pin, button(l), verify(l), l.cloud_id, l.reason]),
   };
 }

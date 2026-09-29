@@ -130,7 +130,8 @@ const defaults = () => ({
   schedule: structuredClone(DEFAULT_SCHEDULE), // jadwal utama, dan aturan (toleransi, lembur) untuk semua jadwal
   schedules: [], // jadwal lain {id, name, days}, dipilih per karyawan (mis. paruh waktu)
   holidays: [], // {date, note}
-  leaves: [], // izin/sakit/cuti/dinas (prioritas 2)
+  leaves: [], // {id, pin, from, to, kind, note}: izin/sakit/cuti/dinas (izin.js)
+  corrections: [], // {id, pin, date, time, reason}: koreksi absen, dihitung sebagai scan; tidak pernah ditulis ke mesin
   backup: { folder: '', last: '' },
   pull: {}, // cloud_id -> ambil data karyawan yang sedang berjalan (karyawan.js)
 });

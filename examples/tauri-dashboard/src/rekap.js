@@ -4,9 +4,9 @@ import {
   $, byPin, data, dayName, deptOf, dmy, duration, esc, exportCsv, exportXlsx, hhmm, inRecap, knownPins, lastMonths,
   logs, monthName, monthRange, nameOf, period, print, reportTitle, scheduleName, scheduleOf, today, DAY_NAMES,
 } from './app.js';
-import { addDays, recap } from './hitung-rekap.js';
+import { LEAVE_KINDS, addDays, correctionScans, recap } from './hitung-rekap.js';
 
-const LABEL = { hadir: 'Hadir', alpa: 'Alpa', libur: 'Libur', izin: 'Izin', sakit: 'Sakit', cuti: 'Cuti', dinas: 'Dinas luar' };
+export const LABEL = { hadir: 'Hadir', alpa: 'Alpa', libur: 'Libur', izin: 'Izin', sakit: 'Sakit', cuti: 'Cuti', dinas: 'Dinas luar' };
 
 let scans = [];
 let loaded = ''; // rentang yang scan-nya sudah diambil
@@ -57,8 +57,9 @@ export async function show(reason) {
     scans = list;
     loaded = `${from} ${to}`;
   }
+  const all = [...scans, ...correctionScans(data.corrections, from, to)]; // koreksi manual dihitung sebagai scan
   // karyawan yang dikenal ditambah PIN yang punya scan, kecuali yang tidak ikut rekap
-  const pins = [...new Set([...knownPins(), ...scans.map((s) => s.pin)])].filter(inRecap).sort(byPin);
+  const pins = [...new Set([...knownPins(), ...all.map((s) => s.pin)])].filter(inRecap).sort(byPin);
   // satu hitungan per jadwal (utama dan jadwal lain), aturan toleransi/lembur sama
   const groups = new Map();
   for (const pin of pins) {
@@ -67,7 +68,7 @@ export async function show(reason) {
     groups.get(s).push(pin);
   }
   result = !(from && to) ? [] : [...groups]
-    .flatMap(([s, ps]) => recap({ scans, pins: ps, schedule: { ...data.schedule, days: s.days }, holidays: data.holidays, leaves: data.leaves,
+    .flatMap(([s, ps]) => recap({ scans: all, pins: ps, schedule: { ...data.schedule, days: s.days }, holidays: data.holidays, leaves: data.leaves,
       from, to, today: today() }))
     .sort((a, b) => byPin(a.pin, b.pin));
   render();
@@ -88,9 +89,14 @@ function scheduleText(days) {
 
 const times = (n, min) => (n ? `${n}× · ${min} mnt` : '');
 const leaveDays = (t) => t.izin + t.sakit + t.cuti + t.dinas;
-function note(d) {
+/** Keterangan hari: libur, catatan izin, koreksi manual beserta alasannya, dan temuan rekap. */
+function note(d, pin) {
+  const leave = LEAVE_KINDS.includes(d.status) && data.leaves.find((l) => l.pin === pin && l.from <= d.date && d.date <= l.to)?.note;
   return [
     d.note,
+    leave,
+    ...data.corrections.filter((c) => c.pin === pin && c.date === d.date).sort((a, b) => a.time.localeCompare(b.time))
+      .map((c) => `Manual ${c.time}: ${c.reason}`),
     d.noOut && 'Lupa absen pulang',
     d.status === 'libur' && d.in != null && d.out == null && 'Scan di hari libur tanpa pulang',
     d.status === 'libur' && d.overtime && 'Lembur hari libur',
@@ -116,7 +122,7 @@ function render() {
       .map(({ pin, total: t }) => `<tr data-pin="${esc(pin)}" tabindex="0" class="klik" title="Lihat rincian per hari">` +
         `<td>${esc(nameOf(pin))}</td><td>${esc(deptOf(pin))}</td><td class="num">${t.workDays}</td><td class="num">${t.present}</td>` +
         `<td class="num">${times(t.late, t.lateMin)}</td><td class="num">${times(t.early, t.earlyMin)}</td>` +
-        `<td class="num">${t.noOut || ''}</td><td class="num">${t.absent || ''}</td><td class="num">${leaveDays(t) || ''}</td>` +
+        `<td class="num">${t.noOut || ''}</td><td class="num">${t.absent || ''}</td><td class="num" title="${LEAVE_KINDS.filter((k) => t[k]).map((k) => `${LABEL[k]} ${t[k]}`).join(' · ')}">${leaveDays(t) || ''}</td>` +
         `<td class="num">${duration(t.hours)}</td><td class="num lembur">${duration(t.overtime)}</td></tr>`)
       .join('') || '<tr><td colspan="11" class="muted">Belum ada karyawan. Ambil data karyawan di tab Karyawan.</td></tr>';
     return;
@@ -125,7 +131,7 @@ function render() {
   $('k-hari').innerHTML = r.days
     .map((d) => `<tr class="${d.status}"><td>${dayName(d.date).slice(0, 3)}, ${dmy(d.date)}</td><td>${hhmm(d.in)}</td><td>${hhmm(d.out)}</td>` +
       `<td>${LABEL[d.status]}</td><td class="num">${d.late || ''}</td><td class="num">${d.early || ''}</td>` +
-      `<td class="num">${duration(d.hours)}</td><td class="num lembur">${duration(d.overtime)}</td><td>${esc(note(d))}</td></tr>`)
+      `<td class="num">${duration(d.hours)}</td><td class="num lembur">${duration(d.overtime)}</td><td>${esc(note(d, r.pin))}</td></tr>`)
     .join('');
 }
 
@@ -169,6 +175,6 @@ function days(pin) {
       { title: 'Lembur (jam)', kind: 'hours', width: 10 }, { title: 'Keterangan', kind: 'text', width: 30 },
     ],
     rows: list.flatMap((r) => r.days.map((d) => [r.pin, nameOf(r.pin), d.date, dayName(d.date), d.in, d.out, LABEL[d.status], d.late,
-      d.early, d.hours, d.overtime, note(d)])),
+      d.early, d.hours, d.overtime, note(d, r.pin)])),
   });
 }
