@@ -7,11 +7,12 @@ import { $, api, bus, connect, devices, emit, listen, loadData, loadDevices, loa
 import * as hariIni from './hari-ini.js';
 import * as izin from './izin.js';
 import * as karyawan from './karyawan.js';
+import * as mesin from './mesin.js';
 import * as pengaturan from './pengaturan.js';
 import * as rekap from './rekap.js';
 import * as riwayat from './riwayat.js';
 
-const TABS = { 'hari-ini': hariIni, riwayat, rekap, izin, karyawan, pengaturan };
+const TABS = { 'hari-ini': hariIni, riwayat, rekap, izin, karyawan, mesin, pengaturan };
 let active = 'hari-ini';
 
 function open(name) {
@@ -47,11 +48,13 @@ async function main() {
     if (ev.type === 'attlog' || ev.type === 'sync_attlog') emit('logs'); // absen baru, atau hasil penyusulan
     if (ev.type === 'get_userinfo') loadUsers();
     karyawan.onEvent(ev);
+    mesin.onEvent(ev);
   });
   open('hari-ini');
   // Susul absen selama PC mati; mesin mengambil perintah ini saat bertanya berikutnya (±20 detik–2 menit)
   for (const d of devices) api('sync_attlog', { cloud_id: d.cloud_id }).catch(() => {});
   karyawan.resumePull();
+  mesin.resume();
   pengaturan.autoBackup();
   // status mesin terhubung/terputus (event devices juga menangani ganti hari), karyawan baru dari mesin
   setInterval(async () => {
@@ -61,7 +64,7 @@ async function main() {
 }
 
 main().catch((e) => {
-  $('mesin').className = 'off';
-  $('mesin').textContent = `Gagal: ${e.message ?? e}. Mungkin port 8013 dipakai program lain (misalnya layanan ` +
+  $('status-mesin').className = 'off';
+  $('status-mesin').textContent = `Gagal: ${e.message ?? e}. Mungkin port 8013 dipakai program lain (misalnya layanan ` +
     'freedom-finger). Tutup program itu, lalu buka lagi aplikasi ini.';
 });

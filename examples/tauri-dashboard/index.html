@@ -16,7 +16,7 @@
       nav button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
       .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
       .spacer { flex: 1; }
-      #mesin, #peringatan { margin: 0 0 16px; } .muted { color: var(--muted); } #isian { margin-top: 24px; font-size: 13px; }
+      #status-mesin, #peringatan { margin: 0 0 16px; } .muted { color: var(--muted); } #isian { margin-top: 24px; font-size: 13px; }
       #pesan { margin: 0 0 12px; padding: 6px 10px; border: 1px solid currentColor; border-radius: 6px; }
       table { width: 100%; border-collapse: collapse; }
       th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
@@ -49,13 +49,14 @@
       <button role="tab" id="tab-rekap" aria-controls="rekap">Rekap</button>
       <button role="tab" id="tab-izin" aria-controls="izin">Izin &amp; koreksi</button>
       <button role="tab" id="tab-karyawan" aria-controls="karyawan">Karyawan</button>
+      <button role="tab" id="tab-mesin" aria-controls="mesin">Mesin</button>
       <button role="tab" id="tab-pengaturan" aria-controls="pengaturan">Pengaturan</button>
     </nav>
     <p id="pesan" role="status" hidden></p>
 
     <section id="hari-ini" role="tabpanel" aria-labelledby="tab-hari-ini">
       <h1>Absen hari ini <span id="jumlah"></span></h1>
-      <p id="mesin" class="muted">Menghubungkan…</p>
+      <p id="status-mesin" class="muted">Menghubungkan…</p>
       <p id="peringatan" class="off" hidden></p>
       <table>
         <thead><tr><th>Jam</th><th>Nama</th><th>PIN</th><th>Tombol mesin</th><th>Verifikasi</th></tr></thead>
@@ -161,6 +162,15 @@
         <thead><tr><th>PIN</th><th>Nama di mesin</th><th>Nama lengkap</th><th>Departemen</th><th>Jadwal</th><th>Ikut rekap</th></tr></thead>
         <tbody id="y-daftar"></tbody>
       </table>
+    </section>
+
+    <section id="mesin" role="tabpanel" aria-labelledby="tab-mesin" hidden>
+      <p class="muted">Server di aplikasi ini menyetel jam mesin otomatis bila selisihnya lebih dari 2 menit. Mesin mengambil
+        perintah ±20 detik sampai 2 menit setelah tombol ditekan.</p>
+      <div id="m-daftar"></div>
+      <h2>Cari mesin di jaringan</h2>
+      <p><button id="m-cari">Cari mesin</button> <span class="muted">Mencari mesin di jaringan kantor lewat port 5005, beserta petunjuk isian menunya.</span></p>
+      <div id="m-hasil"></div>
     </section>
 
     <section id="pengaturan" role="tabpanel" aria-labelledby="tab-pengaturan" class="form" hidden>

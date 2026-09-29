@@ -1,7 +1,7 @@
 # Freedom Finger desktop app
 
 Aplikasi desktop untuk pengguna: server absensi dan aplikasi absensi (absen hari ini, riwayat,
-rekap bulanan, izin dan koreksi absen, export Excel, backup) dalam satu aplikasi. Kodenya sekaligus contoh pemakaian SDK. Sisi Rust menanam server lewat
+rekap bulanan, izin dan koreksi absen, perawatan mesin, export Excel, backup) dalam satu aplikasi. Kodenya sekaligus contoh pemakaian SDK. Sisi Rust menanam server lewat
 `freedom_finger::serve()`, dan halaman memanggil API HTTP-nya dengan `fetch` biasa
 ([`docs/api.md`](../../docs/api.md)), sama seperti aplikasi lain. Installer siap pakai ada di
 [Releases](https://github.com/mazWaz/freedom-finger/releases/latest).
@@ -15,6 +15,7 @@ rekap bulanan, izin dan koreksi absen, export Excel, backup) dalam satu aplikasi
 | Rekap | Per karyawan per bulan: hadir, terlambat, pulang cepat, lupa absen pulang, alpa, izin/sakit/cuti/dinas, jam kerja, lembur; klik untuk rincian per hari |
 | Izin & koreksi | Izin, sakit, cuti, dinas luar (satu hari atau rentang, dengan keterangan); koreksi absen untuk yang lupa scan (jam dan alasan wajib). Bisa diubah dan dihapus |
 | Karyawan | Ambil data karyawan dari mesin; nama lengkap, departemen, jadwal, dan ikut rekap |
+| Mesin | Per mesin: Cloud ID, IP, terakhir aktif, jam mesin dibanding jam PC, firmware; setel jam, tarik ulang semua log, restart (perintah yang menunggu mesin tetap tampil setelah aplikasi dibuka ulang); cari mesin di jaringan |
 | Pengaturan | Nama kantor, jam kerja per hari (jadwal utama dan jadwal lain, mis. paruh waktu), toleransi, batas lembur, hari libur, backup dan pulihkan |
 
 Aturan rekap: scan pertama = masuk, scan terakhir = pulang bila minimal 60 menit sesudahnya
@@ -73,6 +74,6 @@ mendaftarkan autostart. Installer dibuat oleh `.github/workflows/release.yml` (j
 | `src/main.js` | Mulai: tunggu server, event realtime, `sync_attlog` saat start, backup otomatis, pindah tab |
 | `src/app.js` | Bersama: `fetch` ke API, `get_users` untuk nama, `aplikasi.json`, tanggal, export |
 | `src/hitung-rekap.js` | Aturan rekap, fungsi murni tanpa DOM; diuji `src/hitung-rekap.test.js` (`npm test`) |
-| `src/hari-ini.js`, `riwayat.js`, `rekap.js`, `izin.js`, `karyawan.js`, `pengaturan.js` | Satu modul per tab. `karyawan.js`: `get_all_pin` lalu `get_userinfo` per PIN baru, berlanjut walau aplikasi ditutup |
+| `src/hari-ini.js`, `riwayat.js`, `rekap.js`, `izin.js`, `karyawan.js`, `mesin.js`, `pengaturan.js` | Satu modul per tab. `karyawan.js`: `get_all_pin` lalu `get_userinfo` per PIN baru, berlanjut walau aplikasi ditutup |
 | `src-tauri/windows/hooks.nsh` | Aturan firewall saat install dan uninstall di Windows |
 | `simulasi.mjs` | Mesin tiruan untuk developer: satu absen FkWeb ke server |

@@ -134,6 +134,7 @@ const defaults = () => ({
   corrections: [], // {id, pin, date, time, reason}: koreksi absen, dihitung sebagai scan; tidak pernah ditulis ke mesin
   backup: { folder: '', last: '' },
   pull: {}, // cloud_id -> ambil data karyawan yang sedang berjalan (karyawan.js)
+  commands: [], // {trans, cloud_id, type, at}: perintah perawatan yang menunggu mesin (mesin.js)
 });
 export const data = defaults();
 

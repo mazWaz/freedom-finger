@@ -126,6 +126,8 @@ pub struct Service {
     blocks: HashMap<String, Vec<u8>>,
     /// dev_id -> IP terakhir (hanya di memori; mesin bertanya lagi dalam 2 menit setelah server hidup)
     ips: HashMap<String, IpAddr>,
+    /// dev_id -> jam mesin dikurangi jam server (detik), diukur saat mesin terakhir bertanya (hanya di memori)
+    offsets: HashMap<String, i64>,
     port: u16,
     env_file: PathBuf,
     /// Penomoran `trans_id` buatan server.
@@ -142,6 +144,7 @@ impl Service {
             photos: cfg.photos.clone(),
             blocks: HashMap::new(),
             ips: HashMap::new(),
+            offsets: HashMap::new(),
             port: cfg.port,
             env_file: cfg.dir.join(ENV_FILE),
             seq: 0,
@@ -323,8 +326,9 @@ impl Service {
         let now = self.now();
         self.store.update_poll(dev, p.fk_name.as_deref(), p.fk_info.as_ref().unwrap_or(&Value::Null), p.fk_time.as_deref())?;
         if let Some(t) = p.time() {
-            let drift = (t.to_unix(0) - wall(&self.tz).to_unix(0)).abs();
-            if drift > MAX_DRIFT_SECS && !self.store.set_time_in_flight(dev)? {
+            let offset = t.to_unix(0) - wall(&self.tz).to_unix(0);
+            self.offsets.insert(dev.into(), offset);
+            if offset.abs() > MAX_DRIFT_SECS && !self.store.set_time_in_flight(dev)? {
                 println!("jam mesin {dev} = {}, disetel ulang", t.fk14());
                 let trans = format!("auto{}", SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis()));
                 self.store.enqueue(dev, &trans, "set_time", "SET_TIME", &zone_param(self.tz_name()), &now)?;
@@ -405,7 +409,8 @@ impl Service {
                 let fk_time = d.fk_time.map(|t| WallTime::parse_fk14(&t).map_or(t, |w| w.to_string()));
                 let info: Value = serde_json::from_str(d.info.as_deref().unwrap_or("null"))?;
                 return Ok(with_data(json!({
-                    "cloud_id": dev, "device_name": d.name, "last_activity": d.last_activity, "fk_time": fk_time, "info": info,
+                    "cloud_id": dev, "device_name": d.name, "last_activity": d.last_activity, "fk_time": fk_time,
+                    "clock_offset": self.offsets.get(&dev), "info": info,
                     "webhook_url": self.webhook,
                 })));
             }

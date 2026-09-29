@@ -178,8 +178,10 @@ async fn jam_2015_set_time_otomatis_reg_online_get_all_pin_token_salah() {
     let (_, cmd, p) = s.poll("20150101001922").await;
     assert_eq!(cmd, "SET_TIME");
     assert_eq!(parsed(&p)["time"].as_str().unwrap()[..8], now14()[..8]);
+    assert!(s.api("get_device", json!({})).await["data"]["clock_offset"].as_i64().unwrap() < -300_000_000);
     s.api("reg_online", json!({ "trans_id": "5", "pin": "2", "verification": 0 })).await;
     assert_eq!(parsed(&s.poll(&now14()).await.2), json!({ "cmd": "enter_enroll", "param": { "user_id": "2", "backup_number": 0 } }));
+    assert!(s.api("get_device", json!({})).await["data"]["clock_offset"].as_i64().unwrap().abs() <= 1);
     s.api("get_all_pin", json!({ "trans_id": "6" })).await;
     assert_eq!(s.poll(&now14()).await.1, "GET_USER_ID_LIST");
     let rec = |pin: &str| [pin.as_bytes(), &vec![0; 36 - pin.len()]].concat();

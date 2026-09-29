@@ -100,11 +100,13 @@ Log absen dari database, urut waktu, tanpa batas 2 hari seperti di cloud.
 ```json
 {"success": true, "data": {
   "cloud_id": "MESIN01", "device_name": "Fingerspot", "last_activity": "2026-09-29 08:01:12",
-  "fk_time": "2026-09-29 08:01:10", "info": {"firmware": "…"}, "webhook_url": null
+  "fk_time": "2026-09-29 08:01:10", "clock_offset": -2, "info": {"firmware": "…"}, "webhook_url": null
 }}
 ```
 
-`fk_time` adalah jam mesin saat terakhir bertanya. `info` berisi firmware dan jumlah data
+`fk_time` adalah jam mesin saat terakhir bertanya. `clock_offset` adalah jam mesin dikurangi jam
+server dalam detik, diukur saat itu juga (negatif = mesin lebih lambat); `null` sampai mesin
+bertanya sejak server terakhir dinyalakan. `info` berisi firmware dan data yang didukung mesin,
 sesuai laporan mesin.
 
 ### get_backup

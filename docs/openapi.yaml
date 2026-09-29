@@ -404,6 +404,7 @@ components:
         device_name: { type: [string, 'null'] }
         last_activity: { type: [string, 'null'] }
         fk_time: { type: [string, 'null'], description: Jam mesin saat terakhir bertanya }
+        clock_offset: { type: [integer, 'null'], description: 'Jam mesin dikurangi jam server (detik) saat terakhir bertanya; null sebelum mesin bertanya sejak server hidup' }
         info: { type: [object, 'null'] }
         webhook_url: { type: [string, 'null'] }
     Found:

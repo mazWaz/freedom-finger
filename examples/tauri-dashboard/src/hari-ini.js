@@ -20,8 +20,8 @@ export async function show() {
   const on = devices.filter((d) => d.connected).length;
   const ip = (await invoke('lan_ip')) ?? 'IP komputer ini';
   $('isian').textContent = `Isian di mesin (Menu → Jaringan): Mode Internet · Server IP ${ip} · Server Port ${port} · Server Req Ya`;
-  $('mesin').className = on ? 'ok' : 'off';
-  $('mesin').textContent = devices.length
+  $('status-mesin').className = on ? 'ok' : 'off';
+  $('status-mesin').textContent = devices.length
     ? `${on} dari ${devices.length} mesin terhubung`
     : 'Belum ada mesin terhubung. Isi menu mesin seperti di bawah; mesin muncul di sini dalam ±2 menit.';
   // Mesin mengirim ke Server IP yang tetap: bila IP komputer ini berganti, mesin kehilangan tujuan
