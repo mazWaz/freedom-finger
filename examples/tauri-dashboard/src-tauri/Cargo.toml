@@ -1,0 +1,18 @@
+[package]
+name = "freedom-finger-tauri-dashboard"
+version = "0.1.0"
+description = "Contoh: dashboard absen realtime dengan server Freedom Finger tertanam"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+# Contoh berdiri sendiri, bukan bagian workspace root.
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+freedom-finger = { path = "../../../crates/freedom-finger" }
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = [] }

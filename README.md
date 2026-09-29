@@ -9,7 +9,9 @@ lewat API yang bentuknya sama dengan developer.fingerspot.io.
 
 ## Quick start
 
-1. Build program `freedom-finger` (lihat di bawah; rilis siap unduh menyusul).
+1. Unduh file untuk komputer server dari [Releases](https://github.com/mazWaz/freedom-finger/releases),
+   lalu ekstrak: Windows `…-x86_64-pc-windows-msvc.zip`, Linux `…-x86_64-unknown-linux-musl.tar.gz`
+   (ARM64: `aarch64-unknown-linux-musl`), Mac `…-aarch64-apple-darwin.tar.gz` (Intel: `x86_64-apple-darwin`).
 2. Pasang sebagai layanan, dengan hak admin:
    ```sh
    sudo ./freedom-finger install          # Linux, macOS
@@ -29,8 +31,29 @@ Atur di mesin absensi (Menu → Jaringan):
   Server Req   Ya
 ```
 
+Program belum bertanda tangan. Windows: bila muncul "Windows protected your PC", klik
+**More info → Run anyway**. macOS: jalankan sekali `xattr -d com.apple.quarantine freedom-finger`.
+
 Tidak ada file yang perlu diedit: token API dibuat otomatis di `freedom-finger.env`.
 Tidak tahu IP mesin? `freedom-finger cari` mencarinya di jaringan lokal.
+
+## For developers
+
+Aplikasi Anda memanggil API di `http://<server>:8013/api/…` dengan token dari `freedom-finger.env`.
+Untuk JavaScript (Node, Electron, Tauri, browser) ada paket [`packages/js`](packages/js):
+
+```js
+import { connect } from 'freedom-finger';
+
+const ff = connect({ url: 'http://localhost:8013', token: '<FKWEB_TOKEN>' });
+for await (const e of ff.events()) if (e.type === 'attlog') console.log(e.data.pin, e.data.scan);
+```
+
+Contoh lengkap: [`examples/tauri-dashboard`](examples/tauri-dashboard), aplikasi desktop yang
+sekaligus server dan dashboard absen realtime, lengkap dengan mesin tiruan. Spesifikasi API:
+[`docs/openapi.yaml`](docs/openapi.yaml).
+
+## Commands
 
 | Perintah | Isi |
 |---|---|
@@ -45,10 +68,13 @@ Tidak tahu IP mesin? `freedom-finger cari` mencarinya di jaringan lokal.
 | `crates/freedom-finger` | Program dan library server: menerima data mesin, API bergaya developer.fingerspot.io, SQLite |
 | `crates/freedom-finger-sdk` | SDK: protokol TCP 5005 (mode Lokal) dan FkWeb (mode Internet) |
 | `packages/js` | Paket npm `freedom-finger`: klien bertipe, event realtime, menjalankan server di samping aplikasi |
+| `examples/tauri-dashboard` | Contoh aplikasi desktop: server tertanam + dashboard absen realtime |
 
 ## Build and test
 
-Butuh [rustup](https://rustup.rs); versi Rust dipasang otomatis dari `rust-toolchain.toml`.
+Hanya perlu bila tidak memakai file rilis. Butuh [rustup](https://rustup.rs); versi Rust dipasang
+otomatis dari `rust-toolchain.toml`. Rilis dibuat oleh `.github/workflows/release.yml` saat tag
+`v*` di-push.
 
 ```sh
 cargo build --release     # target/release/freedom-finger

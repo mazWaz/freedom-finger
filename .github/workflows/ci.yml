@@ -69,3 +69,14 @@ jobs:
           $t = Measure-Command { .\target\release\freedom-finger.exe uninstall }
           if ($LASTEXITCODE) { exit 1 }
           if ($t.TotalSeconds -gt 15) { throw "layanan berhenti terlalu lama: $($t.TotalSeconds) detik" }
+
+  # Contoh Tauri memakai API crate (serve, Config, banner): pastikan tetap terkompilasi.
+  tauri-example:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -q && sudo apt-get install -yq libwebkit2gtk-4.1-dev librsvg2-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: examples/tauri-dashboard/src-tauri
+      - run: cargo clippy --manifest-path examples/tauri-dashboard/src-tauri/Cargo.toml -- -D warnings

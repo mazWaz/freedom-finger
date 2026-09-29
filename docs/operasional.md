@@ -94,6 +94,7 @@ Hak akses: `1` user, `2` admin (MANAGER), `3` subadmin (OPERATOR).
 | "gambar sidik jari tidak cukup" saat daftar | Tempel bantalan jari rata, diam sampai bunyi, angkat penuh; jari jangan terlalu kering. |
 | `mesin …`: mesin tidak menjawab handshake | Mesin sedang di mode Internet. Pindah ke mode Lokal di menu Jaringan. |
 | Windows: "Windows protected your PC" | Program belum bertanda tangan. Klik **More info → Run anyway**. |
+| macOS: "cannot be opened because the developer cannot be verified" | Program belum bertanda tangan. Jalankan `xattr -d com.apple.quarantine freedom-finger` di folder program. |
 
 ## 6. Security
 

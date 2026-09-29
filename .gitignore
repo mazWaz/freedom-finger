@@ -1,4 +1,6 @@
-/target
+target/
+node_modules/
+dist/
 # Data dan rahasia: token API, database (berisi template sidik jari/wajah), foto absen
 .env
 *.env
