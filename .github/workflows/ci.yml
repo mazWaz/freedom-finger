@@ -38,7 +38,7 @@ jobs:
           up() { for i in $(seq 40); do curl -sf http://127.0.0.1:8013/status.json && return 0; sleep 1; done; return 1; }
           sudo ./target/release/freedom-finger install
           up
-          sudo pkill -9 -f /opt/freedom-finger/freedom-finger
+          sudo pkill -9 -x freedom-finger   # -x: nama proses persis (-f ikut mencocokkan baris perintah pkill sendiri)
           sleep 3
           up
           TOKEN=$(sudo grep '^FKWEB_TOKEN=' /opt/freedom-finger/freedom-finger.env | cut -d= -f2)
