@@ -317,5 +317,6 @@ fn backup_to_salinan_utuh_dan_tidak_menimpa() {
     db.backup_to(&copy).unwrap();
     assert_eq!(Store::open(&copy).unwrap().count_logs("").unwrap(), 2);
     assert!(db.backup_to(&copy).is_err()); // file tujuan sudah ada
+    drop(db); // Windows: file yang masih terbuka tidak bisa dihapus
     std::fs::remove_dir_all(&dir).unwrap();
 }
