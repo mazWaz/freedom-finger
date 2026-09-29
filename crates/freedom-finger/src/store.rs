@@ -1,6 +1,8 @@
 //! Penyimpanan SQLite. Satu-satunya modul yang berisi SQL; skema sama dengan versi TypeScript
 //! sebelumnya, jadi `absensi.db` lama bisa langsung dipakai.
 
+use std::path::Path;
+
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Value, json};
 
@@ -53,7 +55,7 @@ pub struct Backup {
 
 impl Store {
     /// Buka (atau buat) database. `":memory:"` untuk uji.
-    pub fn open(path: &str) -> Result<Self> {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let db = Connection::open(path)?;
         db.execute_batch(
             "CREATE TABLE IF NOT EXISTS devices (cloud_id TEXT PRIMARY KEY, name TEXT, info TEXT, fk_time TEXT, last_activity TEXT);
@@ -94,6 +96,15 @@ impl Store {
             .optional()
     }
 
+    /// Semua mesin yang pernah terhubung, urut Cloud ID.
+    pub fn device_list(&self) -> Result<Vec<(String, Device)>> {
+        let mut q = self.db.prepare("SELECT cloud_id, name, info, fk_time, last_activity FROM devices ORDER BY cloud_id")?;
+        let rows = q.query_map([], |r| {
+            Ok((r.get(0)?, Device { name: r.get(1)?, info: r.get(2)?, fk_time: r.get(3)?, last_activity: r.get(4)? }))
+        })?;
+        rows.collect()
+    }
+
     // --- log ---------------------------------------------------------------------------------
 
     /// Simpan log; `true` bila baru (log ganda diabaikan). `verify` dan `status_scan` mengikuti API
@@ -116,6 +127,11 @@ impl Store {
         }
         tx.commit()?;
         Ok(added)
+    }
+
+    /// Jumlah log dengan `scan_date >= since` (`""` = semua).
+    pub fn count_logs(&self, since: &str) -> Result<i64> {
+        self.db.query_row("SELECT COUNT(*) FROM logs WHERE scan_date >= ?1", [since], |r| r.get(0))
     }
 
     /// Log antara dua tanggal `YYYY-MM-DD` (inklusif), bentuk data `get_attlog`.

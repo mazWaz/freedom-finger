@@ -988,8 +988,8 @@ dari uji yang lulus.
 | 12 test vector | uji di `tcp/mod.rs`, `tcp/record.rs`, `time.rs` |
 | 14 FkWeb | `fkweb/mod.rs` (`Body`), `fkweb/message.rs`, `fkweb/command.rs` |
 
-CLI di atas SDK: `crates/fk-cli` (biner `fk`: `log`, `jam [--sinkron]`, `list`, `add`,
-`edit`, `delete`). Server FkWeb lengkap: `crates/freedom-finger`.
+Program `freedom-finger` (`crates/freedom-finger`) memakai SDK ini untuk server FkWeb dan untuk
+perintah mode Lokal `freedom-finger mesin` (`log`, `jam [--sinkron]`, `list`, `add`, `edit`, `delete`).
 
 ```bash
 cargo test --workspace            # uji offline, tanpa mesin (termasuk test vector bagian 12)

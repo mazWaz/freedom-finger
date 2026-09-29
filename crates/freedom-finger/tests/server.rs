@@ -42,6 +42,7 @@ async fn sim(name: &str) -> Sim {
     tokio::spawn(async move { axum::serve(l, receiver).await });
     let photos = std::env::temp_dir().join(format!("absensi-{}-{name}", std::process::id()));
     let cfg = Config {
+        dir: photos.clone(),
         port: 0,
         token: TOKEN.into(),
         db: ":memory:".into(),

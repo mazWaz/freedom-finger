@@ -3,8 +3,6 @@
 Mesin Fingerspot Revo WF-206BNC mengirim data ke `freedom-finger` di komputer Anda, bukan
 ke cloud Fingerspot. Latar belakang: `riset.md` bagian 10. Protokol: `protokol.md` bagian 14.
 
-> Pemasangan otomatis sebagai layanan (`freedom-finger install`) sedang dikerjakan. Sampai
-> itu, server dijalankan manual (bagian 2).
 
 ## 1. Settings that must stay fixed
 
@@ -13,20 +11,30 @@ ke cloud Fingerspot. Latar belakang: `riset.md` bagian 10. Protokol: `protokol.m
 | Menu mesin → Jaringan | Mode **Internet**, Server IP = **IP komputer server**, Server Port **`8013`**, Server Req **Ya** |
 | Router | **IP tetap (reservasi DHCP)** untuk komputer server dan mesin. Kalau IP server berubah, mesin tidak punya tujuan kirim. |
 | Komputer server | Menyala terus. Selama server mati, mesin menyimpan log dan mengirimnya setelah server hidup lagi. |
-| `.env` (hanya bisa dibaca akun server) | `FKWEB_TOKEN` (token API), opsional `FKWEB_DEVICES` dan `FKWEB_WEBHOOK`; daftar lengkap di `README.md` |
+| `freedom-finger.env` di folder data | Dibuat otomatis berisi `FKWEB_TOKEN` (token API); opsional `FKWEB_DEVICES`, `FKWEB_WEBHOOK`; daftar lengkap di `README.md` |
 
-Mode **Lokal** hanya perlu untuk CLI `fk` (port 5005: kunci keypad, jadwal shift).
+Mode **Lokal** hanya perlu untuk `freedom-finger mesin …` (port 5005: kunci keypad, jadwal shift).
 Selama mode Lokal, server tidak menerima apa pun. Kembalikan ke Internet setelah selesai.
 
 ## 2. Running the server
 
 ```sh
-freedom-finger            # membaca .env di direktori kerja, mendengarkan port 8013
+sudo freedom-finger install     # layanan: jalan sendiri saat komputer menyala (Windows: Run as administrator)
+freedom-finger status           # server berjalan? mesin terhubung?
+freedom-finger cari             # cari mesin di jaringan lokal
+freedom-finger                  # atau jalankan di terminal saja
+sudo freedom-finger uninstall   # lepas layanan; data tetap ada
 ```
 
-Server mencatat ke layar setiap perintah yang dikirim ke mesin (`>> …`) dan setiap kali jam
-mesin disetel ulang. Firewall komputer server harus mengizinkan koneksi masuk ke port 8013
-dari jaringan lokal.
+| OS | Folder data | Layanan | Log |
+|---|---|---|---|
+| Windows | `C:\FreedomFinger` | `FreedomFinger` (services.msc) | - |
+| Linux | `/opt/freedom-finger` | `systemctl status freedom-finger` | `journalctl -u freedom-finger` |
+| macOS | `/opt/freedom-finger` | `launchctl print system/com.github.mazwaz.freedom-finger` | `/opt/freedom-finger/freedom-finger.log` |
+
+`install` membuka port 8013 di firewall Windows, ufw, atau firewalld. Server mencatat setiap
+perintah yang dikirim ke mesin (`>> …`) dan setiap kali jam mesin disetel ulang. Halaman
+`http://localhost:8013` menunjukkan mesin yang terhubung, jumlah absen, dan tombol cari mesin.
 
 ## 3. Using the API
 
@@ -36,20 +44,20 @@ dengan [developer.fingerspot.io](https://developer.fingerspot.io/docs/en/getting
 Daftar lengkap ada di dokumentasi modul `crates/freedom-finger/src/service.rs`.
 
 ```sh
-source .env
-api() { curl -s http://localhost:8013/api/$1 -H "Authorization: Bearer $FKWEB_TOKEN" \
-  -H "Content-Type: application/json" -d "{\"cloud_id\":\"<Cloud ID mesin>\",$2}"; echo; }
+source freedom-finger.env
+api() { curl -s http://localhost:8013/api/$1 -H "Authorization: Bearer $FKWEB_TOKEN" -d "{$2}"; echo; }
 
-api get_attlog '"start_date":"2026-09-29","end_date":"2026-09-29"'   # log dari database
-api get_device '"trans_id":"x"'                                      # status mesin
-api get_userinfo '"trans_id":"u1","pin":"2"'                          # async, lihat hasilnya:
-api get_result '"trans_id":"u1"'                                     # status pending/sent/done/timeout
+api get_devices                                                   # mesin yang terhubung
+api get_attlog '"start_date":"2026-09-29","end_date":"2026-09-29"'  # log dari database
+api get_userinfo '"pin":"2"'                                       # async: balasannya berisi trans_id
+api get_result '"trans_id":"<trans_id dari balasan>"'              # pending/sent/done/timeout
 ```
 
-Cloud ID tertera di menu mesin, dan juga di log server saat mesin pertama kali terhubung.
-Perintah async langsung membalas `{"success":true,"trans_id":…}`. Mesin mengambil
-perintah saat bertanya berikutnya (±20 detik sampai 2 menit). Hasilnya diambil lewat
-`get_result`, atau dikirim ke `FKWEB_WEBHOOK`. `trans_id` harus unik.
+`cloud_id` boleh kosong selama baru satu mesin yang terhubung; bila lebih, isi dengan Cloud
+ID dari `get_devices`. Perintah async langsung membalas `{"success":true,"trans_id":…}`;
+`trans_id` dibuat server bila tidak diisi. Mesin mengambil perintah saat bertanya
+berikutnya (±20 detik sampai 2 menit). Hasilnya diambil lewat `get_result`, atau dikirim ke
+`FKWEB_WEBHOOK`.
 
 ## 4. Everyday tasks
 
@@ -70,17 +78,18 @@ Hak akses: `1` user, `2` admin (MANAGER), `3` subadmin (OPERATOR).
 
 | Gejala | Penyebab dan solusi |
 |---|---|
-| `get_device.last_activity` tidak bergerak | Menu mesin sedang terbuka; keluar ke layar utama. Cek Mode = Internet dan Server IP = IP server. Cek server hidup dan port 8013 tidak diblok firewall. |
+| Mesin tidak muncul di halaman status | Menu mesin sedang terbuka; keluar ke layar utama. `freedom-finger cari` menunjukkan mesin dan isian menu yang benar. Cek port 8013 tidak diblok firewall. |
 | Perintah `status: timeout` | Mesin tidak menjawab perintah atau PIN yang tidak dikenal (misalnya PIN tidak ada). |
 | Jam log 2015 | Mesin sempat mati listrik. Server menyetel jam otomatis; log yang terlanjur tercatat bertanggal 2015 perlu dikoreksi manual. |
 | "gambar sidik jari tidak cukup" saat daftar | Tempel bantalan jari rata, diam sampai bunyi, angkat penuh; jari jangan terlalu kering. |
-| `fk`: mesin tidak menjawab handshake | Mesin sedang di mode Internet. Pindah ke mode Lokal di menu Jaringan. |
+| `mesin …`: mesin tidak menjawab handshake | Mesin sedang di mode Internet. Pindah ke mode Lokal di menu Jaringan. |
+| Windows: "Windows protected your PC" | Program belum bertanda tangan. Klik **More info → Run anyway**. |
 
 ## 6. Security
 
 - `absensi.db` dan `photos/` berisi **data biometrik**. Simpan di folder yang hanya bisa
   dibaca akun server. Backup juga harus disimpan rahasia.
-- Token API ada di `.env`. Jangan dibagikan, dan buat ulang bila bocor
-  (`openssl rand -hex 24`), lalu jalankan ulang server.
+- Token API ada di `freedom-finger.env`. Jangan dibagikan. Bila bocor, hapus baris
+  `FKWEB_TOKEN` (token baru dibuat otomatis), lalu jalankan ulang server.
 - Port 8013 tanpa TLS dan terbuka di LAN. Letakkan mesin dan server di jaringan kantor
   yang tepercaya.

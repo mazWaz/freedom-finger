@@ -1,13 +1,13 @@
-//! `fk`: kelola mesin Fingerspot lewat TCP 5005. Mesin harus di **mode Lokal** (menu Jaringan);
-//! selama itu server absensi tidak menerima data.
+//! `freedom-finger mesin …`: kelola mesin lewat TCP 5005. Mesin harus di **mode Lokal** (menu
+//! Jaringan); selama itu server tidak menerima data. IP mesin: `freedom-finger cari`.
 //!
 //! ```text
-//! fk log > absensi.csv      semua log, baca saja (tidak menandai log "sudah dibaca")
-//! fk jam [--sinkron]        selisih jam mesin vs komputer ini; --sinkron = samakan
-//! fk list
-//! fk add <pin> <nama> [--manager]
-//! fk edit <pin> [--nama <nama>] [--manager | --user] [--aktif | --nonaktif]
-//! fk delete <pin> [--yes]
+//! mesin log > absensi.csv      semua log, baca saja (tidak menandai log "sudah dibaca")
+//! mesin jam [--sinkron]        selisih jam mesin vs komputer ini; --sinkron = samakan
+//! mesin list
+//! mesin add <pin> <nama> [--manager]
+//! mesin edit <pin> [--nama <nama>] [--manager | --user] [--aktif | --nonaktif]
+//! mesin delete <pin> [--yes]
 //! ```
 //!
 //! Hanya PIN yang disebut yang disentuh. Perintah hapus massal (`C1`) sengaja tidak ada.
@@ -15,20 +15,19 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::BufRead;
-use std::process::ExitCode;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use clap::Subcommand;
 use clap::builder::FalseyValueParser;
-use clap::{Parser, Subcommand};
 use freedom_finger_sdk::tcp::Client;
 use freedom_finger_sdk::tcp::record::{NAME_MAX, PIN_MAX, UserEntry};
 use freedom_finger_sdk::time::WallTime;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
-#[derive(Parser)]
-#[command(name = "fk", version, about = "Kelola mesin Fingerspot lewat TCP 5005 (mesin di mode Lokal)")]
-struct Cli {
+/// Argumen `freedom-finger mesin`.
+#[derive(clap::Args)]
+pub struct Args {
     /// Alamat IP mesin (lihat menu Jaringan di mesin)
     #[arg(long, env = "FK_HOST", global = true)]
     host: Option<String>,
@@ -48,7 +47,7 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
-enum Cmd {
+pub enum Cmd {
     /// Semua log ke CSV di stdout (pin, nama, waktu, aksi, verifikasi)
     Log,
     /// Selisih jam mesin vs komputer ini
@@ -159,16 +158,17 @@ impl Fk {
     fn check_time(&mut self) -> Result<i64> {
         let dev = self.c.time()?;
         let diff = (dev.to_unix(self.off) as f64 - unix_now()).round() as i64;
-        println!("mesin {dev}  mac {}  selisih {diff:+} detik", self.now());
+        println!("mesin {dev}  komputer {}  selisih {diff:+} detik", self.now());
         Ok(diff)
     }
 }
 
-fn run(cli: Cli) -> Result<()> {
+/// Jalankan satu perintah ke mesin.
+pub fn run(cli: Args) -> Result<()> {
     if let Cmd::Edit { nama: None, manager: false, user: false, aktif: false, nonaktif: false, .. } = cli.cmd {
         return Err("tidak ada yang diubah".into());
     }
-    let host = cli.host.ok_or("isi alamat IP mesin: --host <IP> atau variabel FK_HOST")?;
+    let host = cli.host.ok_or("isi alamat IP mesin: --host <IP> atau variabel FK_HOST (cari dengan: freedom-finger cari)")?;
     let mut c = Client::connect((host.as_str(), cli.port), cli.password)?;
     c.set_debug(cli.debug);
     let mut fk = Fk { c, off: cli.utc_offset * 3600 };
@@ -261,26 +261,22 @@ fn run(cli: Cli) -> Result<()> {
     Ok(())
 }
 
-fn main() -> ExitCode {
-    match run(Cli::parse()) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(e) => {
-            eprintln!("Gagal: {e}");
-            ExitCode::FAILURE
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use clap::CommandFactory;
+    use clap::{CommandFactory, Parser};
 
     use super::*;
 
+    #[derive(Parser)]
+    struct T {
+        #[command(flatten)]
+        a: Args,
+    }
+
     #[test]
     fn argumen() {
-        Cli::command().debug_assert();
-        let p = |args: &[&str]| Cli::try_parse_from([&["fk", "--host", "192.168.1.201"], args].concat());
+        T::command().debug_assert();
+        let p = |args: &[&str]| T::try_parse_from([&["mesin", "--host", "192.168.1.201"], args].concat()).map(|t| t.a);
         assert!(p(&["add", "99999", "Tes Contoh"]).is_ok());
         assert!(p(&["add", "99999", "Tes", "Contoh"]).is_err()); // nama berspasi harus dikutip
         assert!(p(&["add", "12a", "Tes"]).is_err());

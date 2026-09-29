@@ -19,3 +19,47 @@ jobs:
       - run: cargo doc --workspace --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
+
+  # Pasang sebagai layanan sungguhan (runner punya hak admin), matikan paksa, pastikan hidup lagi, lalu lepas.
+  install:
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release
+      - name: install, matikan paksa, hidup lagi, uninstall (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: |
+          up() { for i in $(seq 40); do curl -sf http://127.0.0.1:8013/status.json && return 0; sleep 1; done; return 1; }
+          sudo ./target/release/freedom-finger install
+          up
+          sudo pkill -9 -f /opt/freedom-finger/freedom-finger
+          sleep 3
+          up
+          TOKEN=$(sudo grep '^FKWEB_TOKEN=' /opt/freedom-finger/freedom-finger.env | cut -d= -f2)
+          curl -sf -X POST http://127.0.0.1:8013/api/get_devices -H "Authorization: Bearer $TOKEN" -d '{}'
+          ./target/release/freedom-finger status
+          sudo ./target/release/freedom-finger uninstall
+          sleep 2
+          ! curl -sf http://127.0.0.1:8013/status.json
+      - name: install, matikan paksa, hidup lagi, uninstall (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          function Up { for ($i = 0; $i -lt 40; $i++) { try { return Invoke-RestMethod http://127.0.0.1:8013/status.json } catch { Start-Sleep 1 } }; throw "server tidak hidup" }
+          .\target\release\freedom-finger.exe install
+          if ($LASTEXITCODE) { exit 1 }
+          Up
+          Stop-Process -Name freedom-finger -Force
+          Start-Sleep 3
+          Up
+          $token = (Select-String -Path C:\FreedomFinger\freedom-finger.env -Pattern '^FKWEB_TOKEN=(.+)').Matches[0].Groups[1].Value
+          Invoke-RestMethod -Method Post http://127.0.0.1:8013/api/get_devices -Headers @{ Authorization = "Bearer $token" } -Body '{}'
+          .\target\release\freedom-finger.exe status
+          .\target\release\freedom-finger.exe uninstall
+          if ($LASTEXITCODE) { exit 1 }

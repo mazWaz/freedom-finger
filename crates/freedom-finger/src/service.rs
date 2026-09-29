@@ -16,10 +16,15 @@
 //! | `sync_attlog` | `GET_LOG_DATA` | tambahan: semua log mesin masuk database |
 //! | `get_backup {pin}` | - | tambahan: cadangan terakhir user, `template` untuk memulihkan |
 //! | `get_result {trans_id}` | - | `pending`/`sent`/`done`/`timeout` + data hasil |
+//! | `get_devices` | - | tambahan: semua mesin yang pernah terhubung, IP, dan status terhubung |
+//! | `scan_devices {password?}` | - | tambahan: cari mesin di jaringan lokal (lapisan `http`, modul `net`) |
 //!
-//! Perintah async membalas `{success, trans_id}`; hasilnya lewat `get_result` dan webhook.
+//! `cloud_id` boleh kosong bila baru satu mesin yang terhubung. `trans_id` perintah async boleh
+//! kosong: server membuatnya. Perintah async membalas `{success, trans_id}`; hasilnya lewat
+//! `get_result` dan webhook.
 
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -34,11 +39,14 @@ use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use serde_json::{Value, json};
 
-use crate::config::Config;
+use crate::config::{Config, ENV_FILE};
+use crate::net::{Found, Mode};
 use crate::store::{Log, Store};
 
 /// Mesin diam saja untuk perintah/PIN yang tidak dikenal: perintah terkirim tanpa hasil selama ini = timeout.
 const TIMEOUT_SECS: i64 = 5 * 60;
+/// Mesin bertanya setiap ±20 detik sampai 2 menit; lebih lama dari ini tanpa kabar = terputus.
+const CONNECTED_SECS: i64 = 3 * 60;
 /// Jam mesin kembali ke 2015 bila listrik mati (baterai RTC): disetel ulang bila selisihnya lebih dari ini.
 const MAX_DRIFT_SECS: i64 = 120;
 /// Hak akses API <-> FkWeb. "3" = subadmin [DUGA].
@@ -86,6 +94,8 @@ pub struct DeviceRequest<'a> {
     pub blk_no: u32,
     pub cmd_return_code: &'a str,
     pub body: &'a [u8],
+    /// Alamat mesin (dari koneksi TCP), untuk daftar mesin.
+    pub remote: Option<IpAddr>,
 }
 
 /// Jawaban ke mesin: header `response_code`/`trans_id`/`cmd_code` + body.
@@ -113,6 +123,12 @@ pub struct Service {
     photos: PathBuf,
     /// dev_id -> blok 1..n yang belum ditutup blok 0
     blocks: HashMap<String, Vec<u8>>,
+    /// dev_id -> IP terakhir (hanya di memori; mesin bertanya lagi dalam 2 menit setelah server hidup)
+    ips: HashMap<String, IpAddr>,
+    port: u16,
+    env_file: PathBuf,
+    /// Penomoran `trans_id` buatan server.
+    seq: u32,
 }
 
 impl Service {
@@ -124,7 +140,59 @@ impl Service {
             devices: cfg.devices.clone(),
             photos: cfg.photos.clone(),
             blocks: HashMap::new(),
+            ips: HashMap::new(),
+            port: cfg.port,
+            env_file: cfg.dir.join(ENV_FILE),
+            seq: 0,
         }
+    }
+
+    /// Semua mesin yang pernah terhubung: Cloud ID, nama, IP, aktivitas terakhir, terhubung atau tidak.
+    pub fn devices(&self) -> Result<Vec<Value>, Error> {
+        let now = wall(&self.tz).to_unix(0);
+        Ok(self
+            .store
+            .device_list()?
+            .into_iter()
+            .map(|(id, d)| {
+                // last_activity = jam dinding "YYYY-MM-DD hh:mm:ss" di zona server
+                let seen = d.last_activity.as_deref().and_then(|t| WallTime::parse_fk14(&t.replace(['-', ' ', ':'], "")));
+                let connected = seen.is_some_and(|t| now - t.to_unix(0) <= CONNECTED_SECS);
+                json!({ "cloud_id": id, "device_name": d.name, "ip": self.ips.get(&id), "last_activity": d.last_activity,
+                        "connected": connected })
+            })
+            .collect())
+    }
+
+    /// Ringkasan untuk halaman status (tanpa PIN atau data pribadi).
+    pub fn status(&self) -> Result<Value, Error> {
+        let today = format!("{} 00:00:00", &self.now()[..10]);
+        Ok(json!({
+            "version": env!("CARGO_PKG_VERSION"), "server_ip": crate::net::lan_ip(), "port": self.port,
+            "env_file": self.env_file, "devices": self.devices()?,
+            "logs_today": self.store.count_logs(&today)?, "logs_total": self.store.count_logs("")?,
+        }))
+    }
+
+    /// Hasil pencarian jaringan + keterangan untuk tiap alamat.
+    pub fn describe(&self, found: &[Found]) -> Vec<Value> {
+        let server = crate::net::lan_ip().map_or_else(|| "IP komputer ini".to_owned(), |ip| ip.to_string());
+        let setting = format!("Mode Internet, Server IP {server}, Server Port {}, Server Req Ya", self.port);
+        found
+            .iter()
+            .map(|f| {
+                let id = self.ips.iter().find(|(_, ip)| **ip == IpAddr::V4(f.ip)).map(|(id, _)| id.clone());
+                let note = match (f.mode, &id) {
+                    (_, Some(_)) => "terhubung ke server ini".to_owned(),
+                    (Mode::Diam, None) => {
+                        format!("kemungkinan mesin di mode Internet yang belum mengirim ke server ini; atur menu Jaringan: {setting}")
+                    }
+                    (Mode::Lokal, None) => format!("mesin di mode Lokal; untuk server ini atur menu Jaringan: {setting}"),
+                    (Mode::Ditolak, None) => "mesin di mode Lokal, password komunikasi berbeda (FK_PASSWORD)".to_owned(),
+                };
+                json!({ "ip": f.ip, "mode": f.mode, "cloud_id": id, "note": note })
+            })
+            .collect()
     }
 
     pub fn webhook(&self) -> Option<&str> {
@@ -143,6 +211,9 @@ impl Service {
 
     pub fn device(&mut self, r: &DeviceRequest<'_>) -> Result<DeviceReply, Error> {
         let dev = r.dev_id;
+        if let Some(ip) = r.remote.filter(|_| ident(dev, 18, "")) {
+            self.ips.insert(dev.into(), ip);
+        }
         if !ident(r.request_code, 32, "") || !ident(dev, 18, "") || self.devices.as_ref().is_some_and(|d| !d.iter().any(|x| x == dev)) {
             return Err(bad("request mesin tidak valid"));
         }
@@ -281,10 +352,14 @@ impl Service {
 
     /// Endpoint `/api/<ep>`; body JSON selalu berisi `cloud_id`.
     pub fn api(&mut self, ep: &str, b: &Value) -> Result<Value, Error> {
-        let dev = text(&b["cloud_id"]);
-        if !ident(&dev, 18, "") {
-            return Err(bad("cloud_id wajib"));
+        if ep == "get_devices" {
+            return Ok(json!({ "success": true, "data": self.devices()? }));
         }
+        let dev = match text(&b["cloud_id"]) {
+            d if d.is_empty() => self.only_device()?,
+            d if ident(&d, 18, "") => d,
+            _ => return Err(bad("cloud_id tidak valid")),
+        };
         let pin = || {
             let p = text(if b["pin"].is_null() { &b["data"]["pin"] } else { &b["pin"] });
             if (1..=22).contains(&p.len()) && digits(&p) { Ok(p) } else { Err(bad("pin harus angka 1-22 digit")) }
@@ -328,9 +403,12 @@ impl Service {
             }
             _ => {}
         }
-        let trans = text(&b["trans_id"]);
+        let trans = match text(&b["trans_id"]) {
+            t if t.is_empty() => self.new_trans(),
+            t => t,
+        };
         if !ident(&trans, 32, "-") {
-            return Err(bad("trans_id wajib (huruf/angka, maks 32)"));
+            return Err(bad("trans_id huruf/angka/-, maks 32"));
         }
         let (code, param) = match ep {
             "get_all_pin" => cmd(&Command::GetUserIdList),
@@ -359,6 +437,21 @@ impl Service {
             return Err(bad("trans_id sudah dipakai"));
         }
         Ok(json!({ "success": true, "trans_id": trans }))
+    }
+
+    /// Cloud ID bila baru satu mesin yang pernah terhubung.
+    fn only_device(&self) -> Result<String, Error> {
+        let ids: Vec<String> = self.store.device_list()?.into_iter().map(|(id, _)| id).collect();
+        match ids.as_slice() {
+            [id] => Ok(id.clone()),
+            [] => Err(bad("belum ada mesin yang terhubung ke server ini (lihat halaman status)")),
+            _ => Err(bad(format!("ada {} mesin, isi cloud_id: {}", ids.len(), ids.join(", ")))),
+        }
+    }
+
+    fn new_trans(&mut self) -> String {
+        self.seq = self.seq.wrapping_add(1);
+        format!("ff{}{}", SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis()), self.seq)
     }
 }
 

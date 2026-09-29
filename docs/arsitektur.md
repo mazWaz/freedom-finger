@@ -23,8 +23,7 @@ mode Lokal, server tidak menerima data.
 | Crate | Isi | Dependency utama |
 |---|---|---|
 | `crates/freedom-finger-sdk` | `tcp` (bingkai, record, `Client`), `fkweb` (`Body`, pesan, `Command`), `time` (`WallTime`) | serde, thiserror; tanpa tokio dan HTTP |
-| `crates/freedom-finger` | `config`, `store`, `service`, `http`, `main` | axum, tokio, rusqlite (SQLite bawaan), ureq, jiff |
-| `crates/fk-cli` | biner `fk`: `log`, `jam`, `list`, `add`, `edit`, `delete` | clap |
+| `crates/freedom-finger` | library `config`, `store`, `service`, `http`, `net`; program `main`, `setup` (layanan OS), `mesin` (TCP 5005) | axum, tokio, rusqlite (SQLite bawaan), ureq, jiff, clap, if-addrs, windows-service |
 
 Crate hanya dipecah bila kebutuhan dependency-nya berbeda. Versi Rust dikunci di
 `rust-toolchain.toml`; lint dan versi dependency bersama diatur di `Cargo.toml` root.
@@ -37,8 +36,9 @@ Crate hanya dipecah bila kebutuhan dependency-nya berbeda. Versi Rust dikunci di
 | `service` | Request mesin, antrean perintah, jam otomatis, cadangan user, endpoint API | Tidak tahu HTTP: masukan `DeviceRequest` atau JSON, keluaran `DeviceReply` atau JSON. Webhook dikembalikan sebagai nilai (`hook`). |
 | `http` | Token Bearer, batas body 32 MB, kirim webhook | `/api/<endpoint>` untuk aplikasi, path lain untuk mesin |
 
-`config` membaca variabel `FKWEB_*` (daftarnya di `README.md`). Tabel endpoint API ada di
-dokumentasi modul `service.rs`.
+`config` membaca `freedom-finger.env` di folder data dan variabel `FKWEB_*` (daftarnya di
+`README.md`), dan membuat token bila belum ada. `net` mencari mesin di jaringan lokal. Tabel
+endpoint API ada di dokumentasi modul `service.rs`; tabel request HTTP di `http.rs`.
 
 ## Decisions
 
@@ -72,7 +72,7 @@ dokumentasi modul `service.rs`.
 1. Kode perintah di `tcp::cmd`; susunan byte sebagai fungsi murni di `tcp/record.rs`,
    dengan test vector.
 2. Metode di `Client` (lewat `must` atau `read_paged`).
-3. Subperintah di `crates/fk-cli` bila perlu.
+3. Subperintah di `crates/freedom-finger/src/mesin.rs` bila perlu.
 4. Catat di `protokol.md` (bagian 5, 6, dan 11) beserta tanda statusnya.
 
 ## Tests and checks
