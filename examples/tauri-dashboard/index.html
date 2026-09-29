@@ -5,28 +5,159 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Freedom Finger</title>
     <style>
-      :root { color-scheme: light dark; --bg: #fff; --fg: #1c1c1c; --muted: #666; --line: #ddd; --ok: #1a7f37; --off: #a65200; }
-      @media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #eee; --muted: #aaa; --line: #333; --ok: #3fb950; --off: #e3a008; } }
-      body { font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); margin: 0; padding: 20px 16px; }
-      h1 { font-size: 20px; margin: 0 0 4px; }
+      :root { color-scheme: light dark; --bg: #fff; --fg: #1c1c1c; --muted: #666; --line: #ddd; --hover: rgba(127, 127, 127, 0.1); --ok: #1a7f37; --off: #a65200; --accent: #0969da; }
+      @media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #eee; --muted: #aaa; --line: #333; --ok: #3fb950; --off: #e3a008; --accent: #58a6ff; } }
+      body { font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); margin: 0; padding: 0 16px 20px; }
+      h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 24px 0 8px; } h3 { font-size: 15px; margin: 16px 0 6px; }
+      input, select, button { font: inherit; } input[type="number"] { width: 5em; }
+      button { padding: 3px 12px; cursor: pointer; }
+      nav { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin: 0 -16px 16px; padding: 0 12px; position: sticky; top: 0; background: var(--bg); z-index: 1; }
+      nav button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 12px; color: var(--muted); }
+      nav button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
+      .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+      .spacer { flex: 1; }
       #mesin, #peringatan { margin: 0 0 16px; } .muted { color: var(--muted); } #isian { margin-top: 24px; font-size: 13px; }
+      #pesan { margin: 0 0 12px; padding: 6px 10px; border: 1px solid currentColor; border-radius: 6px; }
       table { width: 100%; border-collapse: collapse; }
       th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
       th { color: var(--muted); font-weight: 500; }
+      .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      tr.klik { cursor: pointer; } tr.klik:hover, tr.klik:focus { background: var(--hover); outline: none; }
+      tr.alpa td { color: var(--off); } tr.libur td { color: var(--muted); }
+      .tanpa-lembur .lembur { display: none; }
       .ok { color: var(--ok); } .off { color: var(--off); }
       tr.baru { animation: baru 2s; }
       @keyframes baru { from { background: rgba(26, 127, 55, 0.25); } }
+      #y-daftar input:not([type]) { width: 100%; box-sizing: border-box; }
+      label { display: inline-flex; gap: 6px; align-items: center; }
+      .form p { margin: 6px 0; }
+      .print-title { display: none; }
+      @media print {
+        @page { size: A4 landscape; margin: 10mm; }
+        :root { --bg: #fff; --fg: #000; --muted: #444; --line: #bbb; }
+        body { font-size: 10px; padding: 0; }
+        nav, .controls, .no-print, #pesan { display: none !important; }
+        .print-title { display: block; font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+        th, td { padding: 3px 4px; } tr { break-inside: avoid; }
+      }
     </style>
   </head>
   <body>
-    <h1>Absen hari ini <span id="jumlah"></span></h1>
-    <p id="mesin" class="muted">Menghubungkan…</p>
-    <p id="peringatan" class="off" hidden></p>
-    <table>
-      <thead><tr><th>Jam</th><th>PIN</th><th>Status</th><th>Verifikasi</th></tr></thead>
-      <tbody id="daftar"></tbody>
-    </table>
-    <p id="isian" class="muted"></p>
+    <nav role="tablist" aria-label="Menu">
+      <button role="tab" id="tab-hari-ini" aria-controls="hari-ini">Hari ini</button>
+      <button role="tab" id="tab-riwayat" aria-controls="riwayat">Riwayat</button>
+      <button role="tab" id="tab-rekap" aria-controls="rekap">Rekap</button>
+      <button role="tab" id="tab-karyawan" aria-controls="karyawan">Karyawan</button>
+      <button role="tab" id="tab-pengaturan" aria-controls="pengaturan">Pengaturan</button>
+    </nav>
+    <p id="pesan" role="status" hidden></p>
+
+    <section id="hari-ini" role="tabpanel" aria-labelledby="tab-hari-ini">
+      <h1>Absen hari ini <span id="jumlah"></span></h1>
+      <p id="mesin" class="muted">Menghubungkan…</p>
+      <p id="peringatan" class="off" hidden></p>
+      <table>
+        <thead><tr><th>Jam</th><th>Nama</th><th>PIN</th><th>Tombol mesin</th><th>Verifikasi</th></tr></thead>
+        <tbody id="daftar"></tbody>
+      </table>
+      <p id="isian" class="muted"></p>
+    </section>
+
+    <section id="riwayat" role="tabpanel" aria-labelledby="tab-riwayat" hidden>
+      <div class="controls">
+        <select id="r-rentang" aria-label="Rentang">
+          <option value="today">Hari ini</option>
+          <option value="yesterday">Kemarin</option>
+          <option value="week">Minggu ini</option>
+          <option value="month" selected>Bulan ini</option>
+          <option value="lastMonth">Bulan lalu</option>
+          <option value="custom">Pilih tanggal</option>
+        </select>
+        <input type="date" id="r-dari" aria-label="Dari tanggal" /> –
+        <input type="date" id="r-sampai" aria-label="Sampai tanggal" />
+        <input type="search" id="r-cari" placeholder="Cari nama atau PIN" aria-label="Cari nama atau PIN" />
+        <select id="r-mesin" aria-label="Mesin" hidden></select>
+        <span class="spacer"></span>
+        <button id="r-xlsx">Excel</button><button id="r-csv">CSV</button><button id="r-cetak">Cetak</button>
+      </div>
+      <p class="print-title" id="r-judul"></p>
+      <p id="r-info" class="muted"></p>
+      <table>
+        <thead><tr><th>Tanggal</th><th>Jam</th><th>Nama</th><th>PIN</th><th>Tombol mesin</th><th>Verifikasi</th><th>Mesin</th></tr></thead>
+        <tbody id="r-daftar"></tbody>
+      </table>
+    </section>
+
+    <section id="rekap" role="tabpanel" aria-labelledby="tab-rekap" hidden>
+      <div class="controls">
+        <select id="k-bulan" aria-label="Bulan"></select>
+        <input type="date" id="k-dari" aria-label="Dari tanggal" /> –
+        <input type="date" id="k-sampai" aria-label="Sampai tanggal" />
+        <span class="spacer"></span>
+        <button id="k-xlsx">Excel</button><button id="k-csv">CSV</button><button id="k-cetak">Cetak</button>
+      </div>
+      <p class="print-title" id="k-judul"></p>
+      <p id="k-info" class="muted no-print"></p>
+      <div id="k-ringkasan">
+        <table>
+          <thead><tr><th>Nama</th><th>Departemen</th><th class="num">Hari kerja</th><th class="num">Hadir</th><th class="num">Terlambat</th>
+            <th class="num">Pulang cepat</th><th class="num">Lupa pulang</th><th class="num">Alpa</th><th class="num">Izin</th>
+            <th class="num">Jam kerja</th><th class="num lembur">Lembur</th></tr></thead>
+          <tbody id="k-daftar"></tbody>
+        </table>
+        <p class="muted no-print">Klik nama untuk rincian per hari. Jam kerja dan lembur dalam jam:menit.</p>
+      </div>
+      <div id="k-rincian" hidden>
+        <p class="controls"><button id="k-kembali">← Semua karyawan</button></p>
+        <h2 id="k-nama"></h2>
+        <table>
+          <thead><tr><th>Tanggal</th><th>Masuk</th><th>Pulang</th><th>Status</th><th class="num">Terlambat (mnt)</th>
+            <th class="num">Pulang cepat (mnt)</th><th class="num">Jam kerja</th><th class="num lembur">Lembur</th><th>Keterangan</th></tr></thead>
+          <tbody id="k-hari"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="karyawan" role="tabpanel" aria-labelledby="tab-karyawan" hidden>
+      <div class="controls">
+        <button id="y-ambil">Ambil data karyawan dari mesin</button>
+        <span id="y-status" class="muted" role="status"></span>
+      </div>
+      <p class="muted">Nama di mesin maksimal 15 karakter. Nama lengkap dan departemen di sini dipakai di semua layar dan laporan.
+        Karyawan baru yang didaftarkan di mesin muncul sendiri. <span id="y-info"></span></p>
+      <table>
+        <thead><tr><th>PIN</th><th>Nama di mesin</th><th>Nama lengkap</th><th>Departemen</th><th>Jadwal</th><th>Ikut rekap</th></tr></thead>
+        <tbody id="y-daftar"></tbody>
+      </table>
+    </section>
+
+    <section id="pengaturan" role="tabpanel" aria-labelledby="tab-pengaturan" class="form" hidden>
+      <h2>Kantor</h2>
+      <p><label>Nama kantor (judul laporan) <input id="p-kantor" size="36" /></label></p>
+      <h2>Jam kerja</h2>
+      <div id="p-jadwal"></div>
+      <p><button id="p-jadwal-tambah">Tambah jadwal lain</button>
+        <span class="muted">Untuk karyawan dengan jam berbeda, misalnya paruh waktu. Jadwal tiap karyawan dipilih di tab Karyawan.</span></p>
+      <p><label>Toleransi terlambat <input type="number" id="p-toleransi" min="0" max="600" /> menit</label></p>
+      <p><label><input type="checkbox" id="p-lembur-aktif" /> Hitung lembur</label>,
+        <label>mulai minimal <input type="number" id="p-lembur" min="0" max="600" /> menit setelah jam pulang</label></p>
+      <p><label>Scan kedua dihitung pulang bila minimal <input type="number" id="p-jarak" min="0" max="600" /> menit setelah masuk</label></p>
+      <p class="muted">Menit terlambat dihitung dari jam masuk. Contoh: masuk 08:00, toleransi 15, scan 08:20 = terlambat 20 menit.
+        <button id="p-jadwal-awal">Kembalikan ke nilai awal</button></p>
+      <h2>Hari libur</h2>
+      <p class="controls">
+        <input type="date" id="p-libur-tanggal" aria-label="Tanggal libur" />
+        <input id="p-libur-ket" placeholder="Keterangan, mis. Tahun Baru" aria-label="Keterangan libur" size="30" />
+        <button id="p-libur-tambah">Tambah</button>
+      </p>
+      <table style="width: auto"><tbody id="p-libur"></tbody></table>
+      <h2>Backup</h2>
+      <p class="off">Backup berisi data sidik jari dan wajah karyawan. Simpan di tempat yang aman, jangan dibagikan.</p>
+      <p>Folder <code id="p-folder"></code> <button id="p-folder-ganti">Ganti folder</button></p>
+      <p id="p-backup-info"></p>
+      <p class="muted">Backup otomatis sekali sehari saat aplikasi pertama kali hidup; 30 backup terakhir disimpan.</p>
+      <p><button id="p-backup">Backup sekarang</button> <button id="p-pulihkan">Pulihkan dari backup…</button></p>
+    </section>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

@@ -5,7 +5,7 @@ Mesin mengirim absen langsung ke komputer Anda. Ada dua produk:
 
 | Produk | Untuk | Isi |
 |---|---|---|
-| **Aplikasi desktop** | Pengguna (kantor, admin HR) | Installer siap pakai: server absensi dan dashboard absen hari ini dalam satu aplikasi |
+| **Aplikasi desktop** | Pengguna (kantor, admin HR) | Installer siap pakai: server absensi, absen hari ini, riwayat, rekap bulanan, export Excel, dan backup dalam satu aplikasi |
 | **SDK** | Developer yang memasang dan mengintegrasikan sendiri | Program server `freedom-finger`, API bergaya developer.fingerspot.io, crate Rust |
 
 > Freedom Finger adalah proyek independen dan tidak berafiliasi dengan Fingerspot.
@@ -20,6 +20,8 @@ Mesin mengirim absen langsung ke komputer Anda. Ada dua produk:
    walau jendelanya ditutup.
 3. Isi menu mesin (**Menu → Jaringan**) persis seperti petunjuk di bawah daftar absen. Mesin
    muncul dalam ±2 menit, dan absen baru langsung tampil.
+4. Di tab **Karyawan**, tekan **Ambil data karyawan dari mesin**, lalu isi jam kerja kantor di
+   **Pengaturan**. Tab **Rekap** menghitung hadir, terlambat, alpa, jam kerja, dan lembur per bulan.
 
 PC tidak perlu menyala 24 jam. Selama PC mati, mesin menyimpan absen; saat aplikasi hidup lagi,
 semua absen ditarik dari mesin dalam ±2 menit. Minta admin jaringan **mereservasi IP PC ini di
@@ -87,13 +89,14 @@ curl -s http://localhost:8013/api/get_attlog -H "Authorization: Bearer $TOKEN" \
 | `freedom-finger install` / `uninstall` | Pasang atau lepas layanan; data tidak pernah dihapus |
 | `freedom-finger status` | Server berjalan? Mesin terhubung? Jumlah absen |
 | `freedom-finger cari` | Cari mesin di jaringan lokal, beserta petunjuk untuk tiap mesin |
+| `freedom-finger backup FILE` | Salin database ke `FILE`, aman saat server berjalan. Isinya termasuk data jari/wajah: simpan di tempat aman |
 | `freedom-finger mesin …` | Perintah langsung ke mesin di mode Lokal: `log`, `jam`, `list`, `add`, `edit`, `delete` |
 
 | Folder | Isi |
 |---|---|
 | `crates/freedom-finger` | Program dan library server: menerima data mesin, API bergaya developer.fingerspot.io, SQLite |
 | `crates/freedom-finger-sdk` | SDK: protokol TCP 5005 (mode Lokal) dan FkWeb (mode Internet) |
-| `examples/tauri-dashboard` | Aplikasi desktop untuk pengguna, sekaligus contoh dan demo: server tertanam + dashboard realtime |
+| `examples/tauri-dashboard` | Aplikasi desktop untuk pengguna, sekaligus contoh dan demo: server tertanam, riwayat, rekap, export, backup |
 
 ## Build and test
 

@@ -38,6 +38,7 @@ untuk mesin: balasannya hanya `trans_id`, dan hasilnya datang belakangan (lihat
 | `get_attlog` | baca | `{start_date, end_date}` | Log absen |
 | `get_device` | baca | `{}` | Info satu mesin |
 | `get_backup` | baca, tambahan | `{pin}` | Cadangan terakhir satu user |
+| `get_users` | baca, tambahan | `{cloud_id?}` | User yang tercatat di database |
 | `get_result` | baca | `{trans_id}` | Status dan hasil perintah |
 | `get_all_pin` | perintah | `{}` | `{total, pin_arr}` |
 | `get_userinfo` | perintah | `{pin}` | Data user + `template` |
@@ -115,6 +116,20 @@ memulihkan user yang terhapus, termasuk jari, wajah, dan hak aksesnya.
 ```json
 {"success": true, "data": {"pin": "2", "name": "Budi Santoso", "privilege": "1",
   "updated": "2026-09-29 07:55:00", "template": "<base64>"}}
+```
+
+### get_users
+
+User yang tercatat di database server, tanpa perintah ke mesin: nama di mesin (maksimal 15
+karakter), hak akses, dan kapan terakhir diterima. Server mencatat user setiap mesin mengirim
+data user (daftar atau ubah jari/wajah) dan setiap `get_userinfo`. User yang belum pernah
+terkirim belum ada di sini: ambil daftar PIN dengan `get_all_pin`, lalu `get_userinfo` per PIN.
+Tanpa `cloud_id`, hasilnya user semua mesin; PIN yang sama di dua mesin muncul dua kali.
+
+```json
+{"success": true, "data": [
+  {"cloud_id": "MESIN01", "pin": "2", "name": "Budi Santoso", "privilege": "1", "updated": "2026-09-29 07:55:00"}
+]}
 ```
 
 ### get_result

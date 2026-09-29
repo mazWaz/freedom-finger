@@ -22,6 +22,7 @@ Selama mode Lokal, server tidak menerima apa pun. Kembalikan ke Internet setelah
 sudo freedom-finger install     # layanan: jalan sendiri saat komputer menyala (Windows: Run as administrator)
 freedom-finger status           # server berjalan? mesin terhubung?
 freedom-finger cari             # cari mesin di jaringan lokal
+freedom-finger backup FILE      # salin database (aman saat server berjalan)
 freedom-finger                  # atau jalankan di terminal saja
 sudo freedom-finger uninstall   # lepas layanan; data tetap ada
 ```

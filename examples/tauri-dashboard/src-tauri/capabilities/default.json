@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Izin halaman utama",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:default"]
 }

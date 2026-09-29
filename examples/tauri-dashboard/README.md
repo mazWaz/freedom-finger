@@ -1,10 +1,24 @@
 # Freedom Finger desktop app
 
-Aplikasi desktop untuk pengguna: server absensi dan dashboard absen hari ini dalam satu
-aplikasi. Kodenya sekaligus contoh pemakaian SDK. Sisi Rust menanam server lewat
+Aplikasi desktop untuk pengguna: server absensi dan aplikasi absensi (absen hari ini, riwayat,
+rekap bulanan, export Excel, backup) dalam satu aplikasi. Kodenya sekaligus contoh pemakaian SDK. Sisi Rust menanam server lewat
 `freedom_finger::serve()`, dan halaman memanggil API HTTP-nya dengan `fetch` biasa
 ([`docs/api.md`](../../docs/api.md)), sama seperti aplikasi lain. Installer siap pakai ada di
 [Releases](https://github.com/mazWaz/freedom-finger/releases/latest).
+
+## Tabs
+
+| Tab | Isi |
+|---|---|
+| Hari ini | Absen hari ini secara realtime, status mesin, isian menu mesin |
+| Riwayat | Semua scan per rentang tanggal; cari nama atau PIN; pilih mesin; export Excel/CSV dan cetak |
+| Rekap | Per karyawan per bulan: hadir, terlambat, pulang cepat, lupa absen pulang, alpa, jam kerja, lembur; klik untuk rincian per hari |
+| Karyawan | Ambil data karyawan dari mesin; nama lengkap, departemen, jadwal, dan ikut rekap |
+| Pengaturan | Nama kantor, jam kerja per hari (jadwal utama dan jadwal lain, mis. paruh waktu), toleransi, batas lembur, hari libur, backup dan pulihkan |
+
+Aturan rekap: scan pertama = masuk, scan terakhir = pulang bila minimal 60 menit sesudahnya
+(tombol Masuk/Pulang di mesin diabaikan); menit terlambat dihitung dari jam masuk; hari ini
+belum dihitung. Semua aturan ada di `src/hitung-rekap.js` dan diuji dengan `npm test`.
 
 ## Behavior
 
@@ -19,9 +33,13 @@ Aplikasi dirancang untuk PC yang hanya menyala di jam kantor, bukan server 24 ja
 | Isian menu mesin | Ditampilkan di bawah daftar absen, dengan IP PC ini dan port |
 | IP PC berubah | Peringatan bila mesin tidak lagi terhubung dan IP berbeda dari saat terakhir terhubung |
 | Firewall Windows | Installer (NSIS, butuh admin) membuka TCP 8013 untuk jaringan lokal; uninstall menutupnya |
+| Backup | Otomatis sekali sehari saat aplikasi pertama kali hidup, ke folder `Freedom Finger Backup` di folder pengguna (bukan Dokumen, yang sering disinkronkan OneDrive); 30 terakhir disimpan |
+| Pulihkan | Database diganti saat aplikasi mulai ulang; data sebelumnya disimpan sebagai `absensi-sebelum-pulih.db` di folder data |
 
-Data (pengaturan, token, database) ada di folder data aplikasi, misalnya
-`%APPDATA%\io.github.mazwaz.freedom-finger-dashboard` di Windows.
+Data ada di folder data aplikasi, misalnya `%APPDATA%\io.github.mazwaz.freedom-finger-dashboard`
+di Windows: `absensi.db` milik server (log mesin, tidak pernah diubah aplikasi), `aplikasi.json`
+milik aplikasi (nama lengkap, jam kerja, libur; ditulis atomik), dan `freedom-finger.env` (token).
+Backup berisi data sidik jari dan wajah: simpan di tempat yang aman.
 
 ## Run from source
 
@@ -39,6 +57,7 @@ Belum punya mesin? Kirim absen tiruan dari terminal lain:
 
 ```sh
 npm run simulasi         # absen baru muncul di daftar dalam kurang dari 1 detik
+npm test                 # uji aturan rekap (Node 20+, tanpa build)
 ```
 
 Port 8013 sudah dipakai (misalnya layanan `freedom-finger install`)? Jalankan dengan
@@ -47,7 +66,10 @@ mendaftarkan autostart. Installer dibuat oleh `.github/workflows/release.yml` (j
 
 | File | Isi |
 |---|---|
-| `src-tauri/src/main.rs` | Server tertanam, tray, autostart, satu instans; perintah `server` dan `lan_ip` untuk halaman |
-| `src/main.js` | Daftar absen hari ini (`get_devices`, `get_attlog`), event realtime, `sync_attlog` saat start, isian menu dan peringatan IP |
+| `src-tauri/src/main.rs` | Server tertanam, tray, autostart, satu instans; perintah untuk halaman: `aplikasi.json`, export .xlsx/CSV, backup, pulihkan, cetak |
+| `src/main.js` | Mulai: tunggu server, event realtime, `sync_attlog` saat start, backup otomatis, pindah tab |
+| `src/app.js` | Bersama: `fetch` ke API, `get_users` untuk nama, `aplikasi.json`, tanggal, export |
+| `src/hitung-rekap.js` | Aturan rekap, fungsi murni tanpa DOM; diuji `src/hitung-rekap.test.js` (`npm test`) |
+| `src/hari-ini.js`, `riwayat.js`, `rekap.js`, `karyawan.js`, `pengaturan.js` | Satu modul per tab. `karyawan.js`: `get_all_pin` lalu `get_userinfo` per PIN baru, berlanjut walau aplikasi ditutup |
 | `src-tauri/windows/hooks.nsh` | Aturan firewall saat install dan uninstall di Windows |
 | `simulasi.mjs` | Mesin tiruan untuk developer: satu absen FkWeb ke server |

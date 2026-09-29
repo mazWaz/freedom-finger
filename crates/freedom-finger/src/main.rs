@@ -6,6 +6,7 @@
 //! freedom-finger uninstall    hapus layanan; data tetap ada
 //! freedom-finger status       server jalan? mesin terhubung?
 //! freedom-finger cari         cari mesin di jaringan lokal
+//! freedom-finger backup FILE  salin database ke FILE (aman saat server berjalan)
 //! freedom-finger mesin …      perintah langsung ke mesin di mode Lokal (TCP 5005)
 //! ```
 
@@ -18,6 +19,7 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use freedom_finger::config::Config;
+use freedom_finger::store::Store;
 use freedom_finger::{banner, net};
 use serde_json::Value;
 
@@ -49,6 +51,11 @@ enum Cmd {
         /// Password komunikasi mesin (untuk mesin di mode Lokal)
         #[arg(long, env = "FK_PASSWORD", default_value_t = 0)]
         password: u32,
+    },
+    /// Salin database ke file baru (aman saat server berjalan); berisi data jari/wajah, simpan di tempat aman
+    Backup {
+        /// File tujuan, belum boleh ada
+        file: PathBuf,
     },
     /// Perintah langsung ke mesin di mode Lokal (TCP 5005)
     Mesin(mesin::Args),
@@ -95,6 +102,17 @@ fn run(cli: Cli) -> Result<()> {
         }
         Cmd::Status => status(Config::port_of(&data()?))?,
         Cmd::Cari { password } => cari(Config::port_of(&data()?), password)?,
+        Cmd::Backup { file } => {
+            let cfg = Config::load(&data()?)?;
+            if !cfg.db.exists() {
+                return Err(format!("database {} tidak ada", cfg.db.display()).into());
+            }
+            if file.exists() {
+                return Err(format!("{} sudah ada; pilih nama lain", file.display()).into());
+            }
+            Store::open(&cfg.db)?.backup_to(&file)?;
+            println!("✓ {} disalin ke {}", cfg.db.display(), file.display());
+        }
         Cmd::Mesin(a) => mesin::run(a)?,
         Cmd::ServiceRun => service_run()?,
     }

@@ -69,6 +69,13 @@ impl Store {
         Ok(Self { db })
     }
 
+    /// Salin seluruh database ke file baru `path` (`VACUUM INTO`): aman walau server sedang
+    /// menerima absen, dan hasilnya satu file utuh. Gagal bila `path` sudah ada.
+    pub fn backup_to(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.db.execute("VACUUM INTO ?1", [path.as_ref().to_string_lossy()])?;
+        Ok(())
+    }
+
     // --- mesin -------------------------------------------------------------------------------
 
     pub fn touch_device(&self, dev: &str, now: &str) -> Result<()> {
@@ -161,6 +168,20 @@ impl Store {
             params![dev, pin, name, privilege, raw, now],
         )?;
         Ok(())
+    }
+
+    /// Semua user yang tercatat (tanpa data jari/wajah), urut PIN; `dev` kosong = semua mesin.
+    /// `privilege` masih kode FkWeb.
+    pub fn users(&self, dev: &str) -> Result<Vec<Value>> {
+        let mut q = self.db.prepare(
+            "SELECT cloud_id, pin, name, privilege, updated FROM users WHERE ?1 = '' OR cloud_id = ?1
+             ORDER BY length(pin), pin, cloud_id",
+        )?;
+        let rows = q.query_map([dev], |r| {
+            Ok(json!({ "cloud_id": r.get::<_, String>(0)?, "pin": r.get::<_, String>(1)?, "name": r.get::<_, String>(2)?,
+                       "privilege": r.get::<_, String>(3)?, "updated": r.get::<_, String>(4)? }))
+        })?;
+        rows.collect()
     }
 
     pub fn backup(&self, dev: &str, pin: &str) -> Result<Option<Backup>> {

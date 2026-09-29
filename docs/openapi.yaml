@@ -154,6 +154,23 @@ paths:
                   data: { $ref: '#/components/schemas/Backup' }
         default: { $ref: '#/components/responses/Error' }
 
+  /api/get_users:
+    post:
+      operationId: get_users
+      summary: User yang tercatat di database server; tanpa cloud_id = semua mesin (tambahan)
+      requestBody: { $ref: '#/components/requestBodies/Target' }
+      responses:
+        '200':
+          description: Daftar user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { const: true }
+                  data: { type: array, items: { $ref: '#/components/schemas/User' } }
+        default: { $ref: '#/components/responses/Error' }
+
   /api/get_result:
     post:
       operationId: get_result
@@ -434,6 +451,14 @@ components:
         privilege: { $ref: '#/components/schemas/Privilege' }
         updated: { type: string }
         template: { type: string, contentEncoding: base64 }
+    User:
+      type: object
+      properties:
+        cloud_id: { type: string }
+        pin: { type: string }
+        name: { type: string, description: 'Nama di mesin, maksimal 15 karakter' }
+        privilege: { $ref: '#/components/schemas/Privilege' }
+        updated: { type: string, description: Terakhir diterima dari mesin }
     Result:
       type: object
       properties:

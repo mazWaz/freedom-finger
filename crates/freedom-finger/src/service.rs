@@ -15,6 +15,7 @@
 //! | `restart_device` | `RESET_FK` | mesin tidak membalas |
 //! | `sync_attlog` | `GET_LOG_DATA` | tambahan: semua log mesin masuk database |
 //! | `get_backup {pin}` | - | tambahan: cadangan terakhir user, `template` untuk memulihkan |
+//! | `get_users` | - | tambahan: user yang tercatat di database; tanpa `cloud_id` = semua mesin |
 //! | `get_result {trans_id}` | - | `pending`/`sent`/`done`/`timeout` + data hasil |
 //! | `get_devices` | - | tambahan: semua mesin yang pernah terhubung, IP, dan status terhubung |
 //! | `scan_devices {password?}` | - | tambahan: cari mesin di jaringan lokal (lapisan `http`, modul `net`) |
@@ -354,6 +355,18 @@ impl Service {
     pub fn api(&mut self, ep: &str, b: &Value) -> Result<Value, Error> {
         if ep == "get_devices" {
             return Ok(json!({ "success": true, "data": self.devices()? }));
+        }
+        if ep == "get_users" {
+            // tanpa cloud_id = user semua mesin
+            let dev = text(&b["cloud_id"]);
+            if !dev.is_empty() && !ident(&dev, 18, "") {
+                return Err(bad("cloud_id tidak valid"));
+            }
+            let mut users = self.store.users(&dev)?;
+            for u in &mut users {
+                u["privilege"] = api_privilege(u["privilege"].as_str().unwrap_or("")).into();
+            }
+            return Ok(json!({ "success": true, "data": users }));
         }
         let dev = match text(&b["cloud_id"]) {
             d if d.is_empty() => self.only_device()?,

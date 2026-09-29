@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "Freedom Finger",
-        "width": 760,
-        "height": 640,
+        "width": 1000,
+        "height": 700,
         "visible": false
       }
     ],

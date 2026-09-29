@@ -68,7 +68,9 @@ impl Sim {
     }
 
     async fn api(&self, ep: &str, mut body: Value) -> Value {
-        body["cloud_id"] = "MESIN01".into();
+        if body["cloud_id"].is_null() {
+            body["cloud_id"] = "MESIN01".into();
+        }
         let req = Request::post(format!("/api/{ep}"))
             .header("authorization", format!("Bearer {TOKEN}"))
             .body(HttpBody::from(body.to_string()))
@@ -226,6 +228,12 @@ async fn realtime_enroll_data_get_backup_set_userinfo_memulihkan_user() {
     );
     assert_eq!(q.bins, [photo, fp]);
     assert!(B64.decode(bk["template"].as_str().unwrap()).is_ok());
+    // get_users: tanpa template, hak akses kode API; cloud_id kosong = semua mesin
+    let users = s.api("get_users", json!({ "cloud_id": "" })).await["data"].clone();
+    assert_eq!(users.as_array().unwrap().len(), 1);
+    assert_eq!((&users[0]["cloud_id"], &users[0]["pin"], &users[0]["name"]), (&json!("MESIN01"), &json!("13"), &json!("Andi")));
+    assert_eq!((&users[0]["privilege"], users[0].get("template")), (&json!("2"), None));
+    assert_eq!(s.api("get_users", json!({ "cloud_id": "MESIN02" })).await["data"], json!([]));
 }
 
 #[tokio::test]
@@ -295,4 +303,19 @@ async fn events_sse_absen_baru_dan_hasil_perintah() {
         event(&mut body).await,
         json!({ "type": "get_all_pin", "cloud_id": "MESIN01", "trans_id": "11", "data": { "total": 0, "pin_arr": [] } })
     );
+}
+
+#[test]
+fn backup_to_salinan_utuh_dan_tidak_menimpa() {
+    let dir = std::env::temp_dir().join(format!("ff-backup-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let db = Store::open(dir.join("absensi.db")).unwrap();
+    let log = |scan_date| freedom_finger::store::Log { pin: "2", scan_date, io_mode: 1 << 24, verify_mode: 1 << 28, photo: None };
+    db.insert_logs("MESIN01", [log("2026-09-29 08:00:00"), log("2026-09-29 17:00:00")]).unwrap();
+    let copy = dir.join("salinan.db");
+    db.backup_to(&copy).unwrap();
+    assert_eq!(Store::open(&copy).unwrap().count_logs("").unwrap(), 2);
+    assert!(db.backup_to(&copy).is_err()); // file tujuan sudah ada
+    std::fs::remove_dir_all(&dir).unwrap();
 }

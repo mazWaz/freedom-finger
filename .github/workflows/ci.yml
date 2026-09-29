@@ -70,7 +70,7 @@ jobs:
           if ($LASTEXITCODE) { exit 1 }
           if ($t.TotalSeconds -gt 15) { throw "layanan berhenti terlalu lama: $($t.TotalSeconds) detik" }
 
-  # Contoh Tauri memakai API crate (serve, Config, banner): pastikan tetap terkompilasi.
+  # Contoh Tauri memakai API crate (serve, Config, banner, Store): pastikan tetap terkompilasi dan lulus uji.
   tauri-example:
     runs-on: ubuntu-latest
     steps:
@@ -79,4 +79,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: examples/tauri-dashboard/src-tauri
-      - run: cargo clippy --manifest-path examples/tauri-dashboard/src-tauri/Cargo.toml -- -D warnings
+      - run: cargo clippy --manifest-path examples/tauri-dashboard/src-tauri/Cargo.toml --all-targets -- -D warnings
+      - run: cargo test --manifest-path examples/tauri-dashboard/src-tauri/Cargo.toml
+      # aturan rekap (hitung-rekap.js), tanpa dependency npm
+      - run: npm test
+        working-directory: examples/tauri-dashboard
