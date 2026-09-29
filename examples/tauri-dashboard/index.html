@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Absen hari ini</title>
+    <title>Freedom Finger</title>
     <style>
       :root { color-scheme: light dark; --bg: #fff; --fg: #1c1c1c; --muted: #666; --line: #ddd; --ok: #1a7f37; --off: #a65200; }
       @media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #eee; --muted: #aaa; --line: #333; --ok: #3fb950; --off: #e3a008; } }
       body { font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); margin: 0; padding: 20px 16px; }
       h1 { font-size: 20px; margin: 0 0 4px; }
-      #mesin { margin: 0 0 16px; } .muted { color: var(--muted); }
+      #mesin, #peringatan { margin: 0 0 16px; } .muted { color: var(--muted); } #isian { margin-top: 24px; font-size: 13px; }
       table { width: 100%; border-collapse: collapse; }
       th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
       th { color: var(--muted); font-weight: 500; }
@@ -21,10 +21,12 @@
   <body>
     <h1>Absen hari ini <span id="jumlah"></span></h1>
     <p id="mesin" class="muted">Menghubungkan…</p>
+    <p id="peringatan" class="off" hidden></p>
     <table>
       <thead><tr><th>Jam</th><th>PIN</th><th>Status</th><th>Verifikasi</th></tr></thead>
       <tbody id="daftar"></tbody>
     </table>
+    <p id="isian" class="muted"></p>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

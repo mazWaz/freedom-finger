@@ -1,15 +1,41 @@
 # Freedom Finger
 
-Server absensi lokal untuk mesin Fingerspot Revo WF-206BNC: tanpa cloud dan tanpa biaya
-langganan. Mesin mengirim data langsung ke komputer Anda, lalu aplikasi Anda mengambilnya
-lewat API yang bentuknya sama dengan developer.fingerspot.io.
+Absensi lokal untuk mesin Fingerspot Revo WF-206BNC: tanpa cloud dan tanpa biaya langganan.
+Mesin mengirim absen langsung ke komputer Anda. Ada dua produk:
+
+| Produk | Untuk | Isi |
+|---|---|---|
+| **Aplikasi desktop** | Pengguna (kantor, admin HR) | Installer siap pakai: server absensi dan dashboard absen hari ini dalam satu aplikasi |
+| **SDK** | Developer yang memasang dan mengintegrasikan sendiri | Program server `freedom-finger`, API bergaya developer.fingerspot.io, crate Rust |
 
 > Freedom Finger adalah proyek independen dan tidak berafiliasi dengan Fingerspot.
 > "Fingerspot" disebut hanya untuk menjelaskan mesin yang didukung.
 
 ## Quick start
 
-1. Unduh satu file program dari [Releases](https://github.com/mazWaz/freedom-finger/releases/latest):
+1. Unduh installer dari [Releases](https://github.com/mazWaz/freedom-finger/releases/latest):
+   Windows `freedom-finger-desktop-windows-x64-setup.exe`, Mac `freedom-finger-desktop-macos.dmg`,
+   Linux `freedom-finger-desktop-linux-x64.deb` atau `.AppImage`.
+2. Pasang, lalu buka **Freedom Finger**. Aplikasi jalan sendiri setiap login dan tetap di tray
+   walau jendelanya ditutup.
+3. Isi menu mesin (**Menu → Jaringan**) persis seperti petunjuk di bawah daftar absen. Mesin
+   muncul dalam ±2 menit, dan absen baru langsung tampil.
+
+PC tidak perlu menyala 24 jam. Selama PC mati, mesin menyimpan absen; saat aplikasi hidup lagi,
+semua absen ditarik dari mesin dalam ±2 menit. Minta admin jaringan **mereservasi IP PC ini di
+router**, karena mesin mengirim ke IP yang tetap; aplikasi memberi peringatan bila IP berubah.
+
+Installer belum bertanda tangan. Windows: bila muncul "Windows protected your PC", klik
+**More info → Run anyway**. macOS: bila aplikasi ditolak, jalankan
+`xattr -cr "/Applications/Freedom Finger.app"` di Terminal.
+
+## For developers
+
+### Server program
+
+Untuk server 24 jam atau integrasi sendiri, pasang program `freedom-finger` sebagai layanan:
+
+1. Unduh satu file dari [Releases](https://github.com/mazWaz/freedom-finger/releases/latest):
    Windows `freedom-finger.exe`; Linux `freedom-finger-linux-x64` (ARM64: `freedom-finger-linux-arm64`);
    Mac `freedom-finger-macos-arm64` (Intel: `freedom-finger-macos-x64`).
 2. Pasang sebagai layanan, dengan hak admin:
@@ -32,13 +58,11 @@ Atur di mesin absensi (Menu → Jaringan):
   Server Req   Ya
 ```
 
-Program belum bertanda tangan. Windows: bila muncul "Windows protected your PC", klik
-**More info → Run anyway**. macOS: jalankan sekali `xattr -d com.apple.quarantine freedom-finger-macos-arm64`.
+Tidak ada file yang perlu diedit: token API dibuat otomatis di `freedom-finger.env`. Tidak tahu
+IP mesin? `freedom-finger cari` mencarinya di jaringan lokal. macOS/Linux: program unduhan perlu
+`chmod +x`, dan di macOS juga `xattr -d com.apple.quarantine <file>`.
 
-Tidak ada file yang perlu diedit: token API dibuat otomatis di `freedom-finger.env`.
-Tidak tahu IP mesin? `freedom-finger cari` mencarinya di jaringan lokal.
-
-## For developers
+### API
 
 Aplikasi Anda (bahasa apa pun) memanggil `http://<server>:8013/api/<endpoint>` dengan header
 `Authorization: Bearer <token>`; tokennya ada di `freedom-finger.env`. Absen baru dan hasil
@@ -53,7 +77,7 @@ curl -s http://localhost:8013/api/get_attlog -H "Authorization: Bearer $TOKEN" \
 |---|---|
 | [`docs/api.md`](docs/api.md) | Semua endpoint, contoh request dan balasan, event realtime, contoh JavaScript tanpa pustaka |
 | [`docs/openapi.yaml`](docs/openapi.yaml) | Spesifikasi OpenAPI 3.1, untuk Swagger UI atau generator klien |
-| [`examples/tauri-dashboard`](examples/tauri-dashboard) | Aplikasi desktop: server tertanam dan dashboard absen realtime, dengan mesin tiruan |
+| [`examples/tauri-dashboard`](examples/tauri-dashboard) | Kode aplikasi desktop: contoh menanam server di aplikasi Rust dan memakai API-nya |
 
 ## Commands
 
@@ -69,7 +93,7 @@ curl -s http://localhost:8013/api/get_attlog -H "Authorization: Bearer $TOKEN" \
 |---|---|
 | `crates/freedom-finger` | Program dan library server: menerima data mesin, API bergaya developer.fingerspot.io, SQLite |
 | `crates/freedom-finger-sdk` | SDK: protokol TCP 5005 (mode Lokal) dan FkWeb (mode Internet) |
-| `examples/tauri-dashboard` | Contoh aplikasi desktop: server tertanam + dashboard absen realtime |
+| `examples/tauri-dashboard` | Aplikasi desktop untuk pengguna, sekaligus contoh dan demo: server tertanam + dashboard realtime |
 
 ## Build and test
 

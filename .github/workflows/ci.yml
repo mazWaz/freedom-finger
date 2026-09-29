@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update -q && sudo apt-get install -yq libwebkit2gtk-4.1-dev librsvg2-dev
+      - run: sudo apt-get update -q && sudo apt-get install -yq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: examples/tauri-dashboard/src-tauri

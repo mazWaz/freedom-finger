@@ -1,7 +1,7 @@
 name: Release
 
-# Tag v* → build 5 target lalu terbit di GitHub Releases sebagai file program langsung (tanpa
-# zip/tar). Jalankan manual (workflow_dispatch) untuk menguji build saja: hasilnya bisa diunduh
+# Tag v* → program server untuk 5 target (file langsung, tanpa zip/tar) dan installer aplikasi
+# desktop untuk Windows, macOS, Linux, lalu terbit di GitHub Releases. Jalankan manual (workflow_dispatch) untuk menguji build saja: hasilnya bisa diunduh
 # dari halaman run, tanpa rilis.
 on:
   push:
@@ -53,8 +53,73 @@ jobs:
           name: ${{ matrix.asset }}
           path: dist/*
 
+  # Aplikasi desktop untuk pengguna akhir (examples/tauri-dashboard): server tertanam + dashboard.
+  app:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, bundles: nsis }
+          - { os: macos-latest, bundles: dmg, target: universal-apple-darwin }
+          # Ubuntu 22.04: glibc lebih lama, jadi .deb dan .AppImage jalan di distro yang lebih tua juga
+          - { os: ubuntu-22.04, bundles: 'deb,appimage' }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: examples/tauri-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -yq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
+      - if: matrix.target
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: build installer (versi = tag)
+        run: |
+          v=0.0.0; [ "$GITHUB_REF_TYPE" = tag ] && v=${GITHUB_REF_NAME#v}
+          npx tauri build --bundles ${{ matrix.bundles }} ${{ matrix.target && format('--target {0}', matrix.target) || '' }} --config "{\"version\":\"$v\"}"
+      - name: file rilis
+        run: |
+          mkdir -p ../../dist
+          b=src-tauri/target/${{ matrix.target || '.' }}/release/bundle
+          case "$RUNNER_OS" in
+            Windows) cp "$b"/nsis/*-setup.exe ../../dist/freedom-finger-desktop-windows-x64-setup.exe ;;
+            macOS) cp "$b"/dmg/*.dmg ../../dist/freedom-finger-desktop-macos.dmg ;;
+            Linux) cp "$b"/deb/*.deb ../../dist/freedom-finger-desktop-linux-x64.deb
+                   cp "$b"/appimage/*.AppImage ../../dist/freedom-finger-desktop-linux-x64.AppImage ;;
+          esac
+          ls -la ../../dist
+      # PC Windows bersih: pasang, firewall terbuka, server di dalam aplikasi menjawab, lalu uninstall bersih
+      - name: uji installer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: dist
+        run: |
+          Start-Process -Wait .\freedom-finger-desktop-windows-x64-setup.exe -ArgumentList '/S'
+          netsh advfirewall firewall show rule name=FreedomFingerApp
+          if ($LASTEXITCODE) { throw "aturan firewall tidak dibuat" }
+          $dir = 'C:\Program Files\Freedom Finger'
+          $exe = Get-ChildItem "$dir\*.exe" | Where-Object Name -notlike 'uninstall*' | Select-Object -First 1
+          $app = Start-Process $exe.FullName -PassThru
+          $ok = $false
+          for ($i = 0; $i -lt 60 -and -not $ok; $i++) { try { Invoke-RestMethod http://127.0.0.1:8013/status.json; $ok = $true } catch { Start-Sleep 1 } }
+          Stop-Process -Id $app.Id -Force
+          if (-not $ok) { throw "aplikasi tidak menjawab di port 8013" }
+          Start-Process -Wait "$dir\uninstall.exe" -ArgumentList '/S'
+          netsh advfirewall firewall show rule name=FreedomFingerApp | Out-Null
+          if (-not $LASTEXITCODE) { throw "aturan firewall tidak dihapus saat uninstall" }
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}
+          path: dist/*
+
   release:
-    needs: build
+    needs: [build, app]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
@@ -68,16 +133,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > notes.md <<'NOTES'
-          Unduh satu file sesuai komputer server, lalu jalankan `install` dengan hak admin. Langkah lengkap: README bagian Quick start.
+          **Pengguna:** pasang aplikasi desktop (server absensi dan dashboard dalam satu aplikasi). Aplikasi jalan sendiri setiap login dan tetap di tray; absen selama PC mati disusul otomatis saat aplikasi hidup.
 
-          | Komputer | File |
+          | Komputer | Installer aplikasi desktop |
+          |---|---|
+          | Windows 10/11 64-bit | `freedom-finger-desktop-windows-x64-setup.exe` |
+          | Mac (Apple Silicon dan Intel) | `freedom-finger-desktop-macos.dmg` |
+          | Linux 64-bit | `freedom-finger-desktop-linux-x64.deb` atau `.AppImage` |
+
+          **Developer (SDK):** program server `freedom-finger` untuk dipasang sendiri (`freedom-finger install` = layanan 24 jam). Dokumentasi API: `docs/api.md`.
+
+          | Komputer | Program server |
           |---|---|
           | Windows 64-bit | `freedom-finger.exe` |
-          | Linux 64-bit (PC, server) | `freedom-finger-linux-x64` |
+          | Linux 64-bit | `freedom-finger-linux-x64` |
           | Linux ARM64 (Raspberry Pi 4/5, server ARM) | `freedom-finger-linux-arm64` |
-          | Mac Apple Silicon (M1 ke atas) | `freedom-finger-macos-arm64` |
-          | Mac Intel | `freedom-finger-macos-x64` |
+          | Mac Apple Silicon / Intel | `freedom-finger-macos-arm64` / `freedom-finger-macos-x64` |
 
-          Linux dan macOS: jalankan `chmod +x` pada file itu dulu. Program belum bertanda tangan. Windows: bila muncul "Windows protected your PC", klik **More info → Run anyway**. macOS: jalankan sekali `xattr -d com.apple.quarantine <file>`.
+          Belum bertanda tangan. Windows: bila muncul "Windows protected your PC", klik **More info → Run anyway**. macOS: bila aplikasi ditolak, jalankan `xattr -cr "/Applications/Freedom Finger.app"`; untuk program server: `chmod +x` lalu `xattr -d com.apple.quarantine <file>`.
           NOTES
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "Freedom Finger $GITHUB_REF_NAME" --notes-file notes.md
