@@ -1,0 +1,28 @@
+[package]
+name = "freedom-finger"
+version = "0.1.0"
+description = "Server absensi: menerima FkWeb dari mesin, API bergaya developer.fingerspot.io, SQLite"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+axum = "0.8.9"
+base64 = "0.23.1"
+dotenvy = "0.15.7"
+freedom-finger-sdk.workspace = true
+jiff = "0.2.37"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "net"] }
+ureq = "3.4.2"
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tokio = { version = "1.53.1", features = ["time"] }
+tower = { version = "0.5.3", features = ["util"] }
+
+[lints]
+workspace = true

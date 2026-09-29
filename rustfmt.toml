@@ -1,0 +1,3 @@
+# Gaya padat seperti kode awal: baris panjang boleh, satu ekspresi tidak dipecah bila muat.
+max_width = 140
+use_small_heuristics = "Max"

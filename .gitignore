@@ -1,0 +1,8 @@
+/target
+# Data dan rahasia: token API, database (berisi template sidik jari/wajah), foto absen
+.env
+*.env
+*.db
+*.db-*
+photos/
+.DS_Store

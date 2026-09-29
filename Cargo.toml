@@ -1,0 +1,24 @@
+# Freedom Finger: SDK dan server untuk mesin absensi Fingerspot, tanpa cloud. Arsitektur: docs/arsitektur.md
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+publish = false
+license = "MIT OR Apache-2.0"
+
+# Satu tempat untuk versi dependency yang dipakai lebih dari satu crate.
+[workspace.dependencies]
+freedom-finger-sdk = { path = "crates/freedom-finger-sdk" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+strip = true
+lto = "thin"
