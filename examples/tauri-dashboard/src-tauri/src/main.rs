@@ -6,7 +6,7 @@
 use freedom_finger::config::Config;
 use tauri::Manager;
 
-/// Alamat dan token untuk `connect()` di halaman.
+/// Alamat dan token API untuk halaman.
 #[derive(Clone, serde::Serialize)]
 struct Server {
     url: String,

@@ -41,7 +41,7 @@ perintah yang dikirim ke mesin (`>> …`) dan setiap kali jam mesin disetel ulan
 Semua endpoint: `POST http://<IP server>:8013/api/<endpoint>`, dengan header
 `Authorization: Bearer <FKWEB_TOKEN>` dan body JSON berisi `cloud_id`. Bentuknya sama
 dengan [developer.fingerspot.io](https://developer.fingerspot.io/docs/en/getting-started).
-Daftar lengkap ada di dokumentasi modul `crates/freedom-finger/src/service.rs`.
+Daftar lengkap, contoh balasan, dan event realtime ada di `docs/api.md`.
 
 ```sh
 source freedom-finger.env

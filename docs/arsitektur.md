@@ -25,9 +25,8 @@ mode Lokal, server tidak menerima data.
 | `crates/freedom-finger-sdk` | `tcp` (bingkai, record, `Client`), `fkweb` (`Body`, pesan, `Command`), `time` (`WallTime`) | serde, thiserror; tanpa tokio dan HTTP |
 | `crates/freedom-finger` | library `config`, `store`, `service`, `http`, `net`; program `main`, `setup` (layanan OS), `mesin` (TCP 5005) | axum, tokio, rusqlite (SQLite bawaan), ureq, jiff, clap, if-addrs, windows-service |
 
-`packages/js` (paket npm `freedom-finger`) memakai API HTTP saja, tanpa dependency dan tanpa
-langkah build: `index.js` (ESM) dan `index.d.ts` ditulis langsung. `start()` menjalankan
-program `freedom-finger` sebagai proses anak; add-on native baru dibuat bila memang perlu.
+Aplikasi memakai server lewat HTTP saja (`docs/api.md`); tidak ada pustaka klien. Aplikasi Rust
+bisa menanam server langsung lewat `freedom_finger::serve()`, seperti `examples/tauri-dashboard`.
 
 Crate hanya dipecah bila kebutuhan dependency-nya berbeda. Versi Rust dikunci di
 `rust-toolchain.toml`; lint dan versi dependency bersama diatur di `Cargo.toml` root.
@@ -43,7 +42,7 @@ Crate hanya dipecah bila kebutuhan dependency-nya berbeda. Versi Rust dikunci di
 `config` membaca `freedom-finger.env` di folder data dan variabel `FKWEB_*` (daftarnya di
 `README.md`), dan membuat token bila belum ada. `net` mencari mesin di jaringan lokal. Tabel
 endpoint API ada di dokumentasi modul `service.rs` dan `docs/openapi.yaml`; tabel request HTTP
-di `http.rs`. Endpoint baru: tambahkan juga ke `openapi.yaml` dan `packages/js`.
+di `http.rs`. Endpoint baru: tambahkan juga ke `docs/api.md` dan `docs/openapi.yaml`.
 
 ## Decisions
 

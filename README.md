@@ -40,19 +40,20 @@ Tidak tahu IP mesin? `freedom-finger cari` mencarinya di jaringan lokal.
 
 ## For developers
 
-Aplikasi Anda memanggil API di `http://<server>:8013/api/…` dengan token dari `freedom-finger.env`.
-Untuk JavaScript (Node, Electron, Tauri, browser) ada paket [`packages/js`](packages/js):
+Aplikasi Anda (bahasa apa pun) memanggil `http://<server>:8013/api/<endpoint>` dengan header
+`Authorization: Bearer <token>`; tokennya ada di `freedom-finger.env`. Absen baru dan hasil
+perintah bisa diterima realtime lewat `GET /api/events`.
 
-```js
-import { connect } from 'freedom-finger';
-
-const ff = connect({ url: 'http://localhost:8013', token: '<FKWEB_TOKEN>' });
-for await (const e of ff.events()) if (e.type === 'attlog') console.log(e.data.pin, e.data.scan);
+```sh
+curl -s http://localhost:8013/api/get_attlog -H "Authorization: Bearer $TOKEN" \
+  -d '{"start_date":"2026-09-29","end_date":"2026-09-29"}'
 ```
 
-Contoh lengkap: [`examples/tauri-dashboard`](examples/tauri-dashboard), aplikasi desktop yang
-sekaligus server dan dashboard absen realtime, lengkap dengan mesin tiruan. Spesifikasi API:
-[`docs/openapi.yaml`](docs/openapi.yaml).
+| Dokumen | Isi |
+|---|---|
+| [`docs/api.md`](docs/api.md) | Semua endpoint, contoh request dan balasan, event realtime, contoh JavaScript tanpa pustaka |
+| [`docs/openapi.yaml`](docs/openapi.yaml) | Spesifikasi OpenAPI 3.1, untuk Swagger UI atau generator klien |
+| [`examples/tauri-dashboard`](examples/tauri-dashboard) | Aplikasi desktop: server tertanam dan dashboard absen realtime, dengan mesin tiruan |
 
 ## Commands
 
@@ -68,7 +69,6 @@ sekaligus server dan dashboard absen realtime, lengkap dengan mesin tiruan. Spes
 |---|---|
 | `crates/freedom-finger` | Program dan library server: menerima data mesin, API bergaya developer.fingerspot.io, SQLite |
 | `crates/freedom-finger-sdk` | SDK: protokol TCP 5005 (mode Lokal) dan FkWeb (mode Internet) |
-| `packages/js` | Paket npm `freedom-finger`: klien bertipe, event realtime, menjalankan server di samping aplikasi |
 | `examples/tauri-dashboard` | Contoh aplikasi desktop: server tertanam + dashboard absen realtime |
 
 ## Build and test
@@ -80,7 +80,6 @@ otomatis dari `rust-toolchain.toml`. Rilis dibuat oleh `.github/workflows/releas
 ```sh
 cargo build --release     # target/release/freedom-finger
 cargo test --workspace    # uji offline, tanpa mesin
-node packages/js/test.mjs # paket JS dengan mesin simulasi
 ```
 
 ## Settings
@@ -98,8 +97,7 @@ menang bila keduanya ada.
 | `FKWEB_WEBHOOK` | - | URL penerima callback |
 | `FKWEB_PHOTOS` | `photos` | Folder foto absen, relatif ke folder data |
 
-Contoh pemakaian API ada di `docs/operasional.md` bagian 3; spesifikasinya di `docs/openapi.yaml`.
-Absen baru dan hasil perintah juga bisa diterima realtime lewat `GET /api/events` (SSE).
+Dokumentasi API: `docs/api.md`.
 
 ## Local mode commands
 
@@ -118,6 +116,7 @@ freedom-finger mesin --help    # semua perintah dan variabel FK_*
 |---|---|
 | `docs/arsitektur.md` | Susunan kode, keputusan, cara menambah perintah dan endpoint |
 | `docs/operasional.md` | Menjalankan server, API, pekerjaan sehari-hari, masalah umum |
+| `docs/api.md` | API untuk aplikasi: endpoint, contoh, event realtime |
 | `docs/openapi.yaml` | Spesifikasi API (OpenAPI 3.1) |
 | `docs/protokol.md` | Spesifikasi TCP 5005 dan FkWeb, test vector |
 | `docs/riset.md` | Laporan riset dan riwayat keputusan |

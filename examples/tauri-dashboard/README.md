@@ -1,8 +1,8 @@
 # Tauri dashboard example
 
 Aplikasi desktop yang sekaligus menjadi server Freedom Finger dan dashboard absen hari ini,
-realtime. Sisi Rust menjalankan `freedom_finger::serve()` di dalam aplikasi. Halaman memakai
-paket JS `freedom-finger` (`connect()` dan `events()`), sama seperti aplikasi lain.
+realtime. Sisi Rust menjalankan `freedom_finger::serve()` di dalam aplikasi. Halaman memanggil
+API HTTP-nya dengan `fetch` biasa ([`docs/api.md`](../../docs/api.md)), sama seperti aplikasi lain.
 
 ## Run
 
@@ -28,5 +28,5 @@ Port 8013 sudah dipakai (misalnya layanan `freedom-finger install`)? Jalankan de
 | File | Isi |
 |---|---|
 | `src-tauri/src/main.rs` | Menjalankan server; perintah `server` memberi alamat dan token ke halaman |
-| `src/main.js` | Daftar absen hari ini; tiap event `attlog` memuat ulang daftar |
+| `src/main.js` | Daftar absen hari ini lewat `get_devices` dan `get_attlog`; tiap event `attlog` memuat ulang daftar |
 | `simulasi.mjs` | Mesin tiruan: satu absen FkWeb ke server |

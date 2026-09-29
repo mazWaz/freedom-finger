@@ -1,7 +1,6 @@
 // Dashboard absen hari ini, realtime. Server Freedom Finger berjalan di dalam aplikasi ini
-// (src-tauri/src/main.rs); halaman ini memakai paket JS freedom-finger seperti aplikasi lain.
+// (src-tauri/src/main.rs); halaman ini memakai API HTTP-nya (docs/api.md) seperti aplikasi lain.
 import { invoke } from '@tauri-apps/api/core';
-import { connect } from 'freedom-finger';
 
 const STATUS = ['Masuk', 'Pulang'];
 const VERIFY = { 1: 'Jari', 2: 'Password', 3: 'Kartu', 4: 'Wajah' };
@@ -11,18 +10,25 @@ const today = () => new Date().toLocaleDateString('sv'); // YYYY-MM-DD, jam komp
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 async function main() {
-  const ff = connect(await invoke('server'));
+  const { url, token } = await invoke('server');
+  const headers = { authorization: `Bearer ${token}` };
+  const api = async (endpoint, body = {}) => {
+    const r = await fetch(`${url}/api/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.message);
+    return j.data;
+  };
   let shown = new Set();
 
   async function load() {
-    const devices = await ff.getDevices();
+    const devices = await api('get_devices');
     const on = devices.filter((d) => d.connected).length;
     $('mesin').className = on ? 'ok' : 'off';
     $('mesin').textContent = devices.length
       ? `${on} dari ${devices.length} mesin terhubung`
       : 'Belum ada mesin. Di mesin, Menu → Jaringan: Mode Internet, Server IP = IP komputer ini, Server Port 8013.';
     const day = today();
-    const logs = (await Promise.all(devices.map((d) => ff.getAttlog({ cloud_id: d.cloud_id, start_date: day, end_date: day })))).flat();
+    const logs = (await Promise.all(devices.map((d) => api('get_attlog', { cloud_id: d.cloud_id, start_date: day, end_date: day })))).flat();
     logs.sort((a, b) => b.scan_date.localeCompare(a.scan_date));
     const key = (l) => `${l.pin} ${l.scan_date}`;
     $('jumlah').textContent = `(${logs.length})`;
@@ -33,8 +39,26 @@ async function main() {
     shown = new Set(logs.map(key));
   }
 
+  // Event realtime (SSE lewat fetch, karena EventSource tidak bisa mengirim token); tiap absen baru
+  // memuat ulang daftar. Tersambung ulang sendiri bila koneksi putus.
   (async () => {
-    for await (const e of ff.events()) if (e.type === 'attlog') await load(); // absen baru: muat ulang daftar
+    for (;;) {
+      try {
+        const r = await fetch(`${url}/api/events`, { headers });
+        const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
+        let buf = '';
+        for (let c; !(c = await reader.read()).done; ) {
+          buf += c.value;
+          let i;
+          while ((i = buf.indexOf('\n\n')) >= 0) {
+            const line = buf.slice(0, i).split('\n').find((l) => l.startsWith('data:'));
+            buf = buf.slice(i + 2);
+            if (line && JSON.parse(line.slice(5)).type === 'attlog') await load();
+          }
+        }
+      } catch {}
+      await new Promise((ok) => setTimeout(ok, 1000));
+    }
   })();
   await load();
   setInterval(load, 60_000); // status mesin terhubung/terputus, dan ganti hari
