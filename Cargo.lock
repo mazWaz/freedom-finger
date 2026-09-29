@@ -300,7 +300,7 @@ dependencies = [
 
 [[package]]
 name = "freedom-finger"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "axum",
  "base64",
