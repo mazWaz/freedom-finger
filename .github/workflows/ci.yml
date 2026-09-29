@@ -38,7 +38,8 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           up() { for i in $(seq 40); do curl -sf http://127.0.0.1:8013/status.json && return 0; sleep 1; done; return 1; }
-          sudo ./target/release/freedom-finger install
+          cp target/release/freedom-finger ./freedom-finger-unduhan   # seperti file rilis: nama lain
+          sudo ./freedom-finger-unduhan install
           up
           sudo pkill -9 -x freedom-finger   # -x: nama proses persis (-f ikut mencocokkan baris perintah pkill sendiri)
           sleep 3
@@ -54,7 +55,8 @@ jobs:
         shell: pwsh
         run: |
           function Up { for ($i = 0; $i -lt 40; $i++) { try { return Invoke-RestMethod http://127.0.0.1:8013/status.json } catch { Start-Sleep 1 } }; throw "server tidak hidup" }
-          .\target\release\freedom-finger.exe install
+          Copy-Item .\target\release\freedom-finger.exe .\freedom-finger-unduhan.exe   # nama lain; terpasang sebagai freedom-finger.exe
+          .\freedom-finger-unduhan.exe install
           if ($LASTEXITCODE) { exit 1 }
           Up
           Stop-Process -Name freedom-finger -Force

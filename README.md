@@ -9,13 +9,14 @@ lewat API yang bentuknya sama dengan developer.fingerspot.io.
 
 ## Quick start
 
-1. Unduh file untuk komputer server dari [Releases](https://github.com/mazWaz/freedom-finger/releases),
-   lalu ekstrak: Windows `…-x86_64-pc-windows-msvc.zip`, Linux `…-x86_64-unknown-linux-musl.tar.gz`
-   (ARM64: `aarch64-unknown-linux-musl`), Mac `…-aarch64-apple-darwin.tar.gz` (Intel: `x86_64-apple-darwin`).
+1. Unduh satu file program dari [Releases](https://github.com/mazWaz/freedom-finger/releases/latest):
+   Windows `freedom-finger.exe`; Linux `freedom-finger-linux-x64` (ARM64: `freedom-finger-linux-arm64`);
+   Mac `freedom-finger-macos-arm64` (Intel: `freedom-finger-macos-x64`).
 2. Pasang sebagai layanan, dengan hak admin:
    ```sh
-   sudo ./freedom-finger install          # Linux, macOS
-   .\freedom-finger.exe install           # Windows, terminal "Run as administrator"
+   .\freedom-finger.exe install                  # Windows, terminal "Run as administrator"
+   chmod +x freedom-finger-linux-x64            # Linux, macOS: sesuaikan nama file
+   sudo ./freedom-finger-linux-x64 install
    ```
 3. Isi menu mesin persis seperti yang tampil di layar, lalu buka `http://localhost:8013`
    untuk melihat mesin terhubung dan jumlah absen hari ini.
@@ -32,7 +33,7 @@ Atur di mesin absensi (Menu → Jaringan):
 ```
 
 Program belum bertanda tangan. Windows: bila muncul "Windows protected your PC", klik
-**More info → Run anyway**. macOS: jalankan sekali `xattr -d com.apple.quarantine freedom-finger`.
+**More info → Run anyway**. macOS: jalankan sekali `xattr -d com.apple.quarantine freedom-finger-macos-arm64`.
 
 Tidak ada file yang perlu diedit: token API dibuat otomatis di `freedom-finger.env`.
 Tidak tahu IP mesin? `freedom-finger cari` mencarinya di jaringan lokal.

@@ -32,7 +32,8 @@ pub fn install() -> Result<(Config, Vec<String>), String> {
     os::need_admin()?;
     let dir = dir();
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let target = dir.join(exe.file_name().ok_or("nama program tidak terbaca")?);
+    // nama tetap, apa pun nama file unduhan (mis. freedom-finger-linux-x64)
+    let target = dir.join(format!("freedom-finger{}", std::env::consts::EXE_SUFFIX));
     os::stop(); // supaya program lama boleh ditimpa
     fs::create_dir_all(&dir).map_err(admin)?;
     if !same_file(&exe, &target) {

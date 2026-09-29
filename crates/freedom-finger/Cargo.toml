@@ -1,6 +1,6 @@
 [package]
 name = "freedom-finger"
-version = "0.1.0"
+version = "0.1.1"
 description = "Server absensi: menerima FkWeb dari mesin, API bergaya developer.fingerspot.io, SQLite"
 edition.workspace = true
 rust-version.workspace = true

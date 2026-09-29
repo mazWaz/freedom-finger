@@ -1,7 +1,8 @@
 name: Release
 
-# Tag v* → build 5 target lalu terbit di GitHub Releases. Jalankan manual (workflow_dispatch)
-# untuk menguji build saja: hasilnya bisa diunduh dari halaman run, tanpa rilis.
+# Tag v* → build 5 target lalu terbit di GitHub Releases sebagai file program langsung (tanpa
+# zip/tar). Jalankan manual (workflow_dispatch) untuk menguji build saja: hasilnya bisa diunduh
+# dari halaman run, tanpa rilis.
 on:
   push:
     tags: ['v*']
@@ -16,15 +17,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: windows-latest, target: x86_64-pc-windows-msvc }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, asset: freedom-finger.exe }
           # musl: satu file statis, jalan di distro Linux mana pun (tanpa ketergantungan versi glibc)
-          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl }
-          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl }
-          - { os: macos-latest, target: aarch64-apple-darwin }
-          - { os: macos-latest, target: x86_64-apple-darwin }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, asset: freedom-finger-linux-x64 }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, asset: freedom-finger-linux-arm64 }
+          - { os: macos-latest, target: aarch64-apple-darwin, asset: freedom-finger-macos-arm64 }
+          - { os: macos-latest, target: x86_64-apple-darwin, asset: freedom-finger-macos-x64 }
     runs-on: ${{ matrix.os }}
     env:
-      NAME: freedom-finger-${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}-${{ matrix.target }}
       # Windows: CRT statis, supaya jalan di PC bersih tanpa Visual C++ Redistributable
       RUSTFLAGS: ${{ matrix.target == 'x86_64-pc-windows-msvc' && '-C target-feature=+crt-static' || '' }}
     steps:
@@ -33,25 +33,18 @@ jobs:
         run: sudo apt-get update -q && sudo apt-get install -yq musl-tools
       - run: rustup target add ${{ matrix.target }}
       - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: file rilis
+        shell: bash
+        run: |
+          mkdir dist
+          cp target/${{ matrix.target }}/release/freedom-finger${{ runner.os == 'Windows' && '.exe' || '' }} dist/${{ matrix.asset }}
       - name: jalan? (target yang sama dengan runner)
         if: matrix.target != 'x86_64-apple-darwin'
         shell: bash
-        run: target/${{ matrix.target }}/release/freedom-finger --version
-      - name: paket
-        shell: bash
-        run: |
-          mkdir -p "$NAME" dist
-          cp README.md LICENSE-MIT LICENSE-APACHE "$NAME/"
-          if [ "$RUNNER_OS" = Windows ]; then
-            cp target/${{ matrix.target }}/release/freedom-finger.exe "$NAME/"
-            7z a -bd "dist/$NAME.zip" "$NAME" > /dev/null
-          else
-            cp target/${{ matrix.target }}/release/freedom-finger "$NAME/"
-            tar czf "dist/$NAME.tar.gz" "$NAME"
-          fi
+        run: dist/${{ matrix.asset }} --version
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}
+          name: ${{ matrix.asset }}
           path: dist/*
 
   release:
@@ -69,16 +62,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > notes.md <<'NOTES'
-          Unduh sesuai komputer server, ekstrak, lalu jalankan `freedom-finger install` dengan hak admin. Langkah lengkap: README bagian Quick start.
+          Unduh satu file sesuai komputer server, lalu jalankan `install` dengan hak admin. Langkah lengkap: README bagian Quick start.
 
-          | Komputer | Akhiran nama file |
+          | Komputer | File |
           |---|---|
-          | Windows 64-bit | `x86_64-pc-windows-msvc.zip` |
-          | Linux 64-bit (PC, server) | `x86_64-unknown-linux-musl.tar.gz` |
-          | Linux ARM64 (Raspberry Pi 4/5, server ARM) | `aarch64-unknown-linux-musl.tar.gz` |
-          | Mac Apple Silicon (M1 ke atas) | `aarch64-apple-darwin.tar.gz` |
-          | Mac Intel | `x86_64-apple-darwin.tar.gz` |
+          | Windows 64-bit | `freedom-finger.exe` |
+          | Linux 64-bit (PC, server) | `freedom-finger-linux-x64` |
+          | Linux ARM64 (Raspberry Pi 4/5, server ARM) | `freedom-finger-linux-arm64` |
+          | Mac Apple Silicon (M1 ke atas) | `freedom-finger-macos-arm64` |
+          | Mac Intel | `freedom-finger-macos-x64` |
 
-          Program belum bertanda tangan. Windows: bila muncul "Windows protected your PC", klik **More info → Run anyway**. macOS: jalankan sekali `xattr -d com.apple.quarantine freedom-finger` di folder hasil ekstrak.
+          Linux dan macOS: jalankan `chmod +x` pada file itu dulu. Program belum bertanda tangan. Windows: bila muncul "Windows protected your PC", klik **More info → Run anyway**. macOS: jalankan sekali `xattr -d com.apple.quarantine <file>`.
           NOTES
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "Freedom Finger $GITHUB_REF_NAME" --notes-file notes.md
