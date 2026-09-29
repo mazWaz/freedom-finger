@@ -7,12 +7,12 @@ yang sama: jawabannya identik, kecuali teks satu pesan error.
 
 ```text
                  mesin Fingerspot Revo WF-206BNC
-          mode Internet │ HTTP POST / (FkWeb)          mode Lokal │ TCP 5005
-                        ▼                                         ▲
- aplikasi ─ POST /api/<endpoint> ─▶ freedom-finger              fk (CLI)
- webhook  ◀─ attlog, hasil perintah ─┤ http → service → store      │
-                                     │        │        (SQLite)   │
-                                     └ freedom_finger_sdk::fkweb    freedom_finger_sdk::tcp::Client
+          mode Internet │ HTTP POST / (FkWeb)               mode Lokal │ TCP 5005
+                        ▼                                              ▲
+ aplikasi ─ POST /api/<endpoint> ─────▶ freedom-finger            mesin (CLI)
+ webhook, SSE ◀─ attlog, hasil perintah ─┤ http → service → store      │
+                                         │        │        (SQLite)    │
+                                         └ freedom_finger_sdk::fkweb   freedom_finger_sdk::tcp::Client
 ```
 
 Mesin hanya bisa di satu mode pada satu waktu (menu **Jaringan → Mode**). Selama mesin di
@@ -25,6 +25,10 @@ mode Lokal, server tidak menerima data.
 | `crates/freedom-finger-sdk` | `tcp` (bingkai, record, `Client`), `fkweb` (`Body`, pesan, `Command`), `time` (`WallTime`) | serde, thiserror; tanpa tokio dan HTTP |
 | `crates/freedom-finger` | library `config`, `store`, `service`, `http`, `net`; program `main`, `setup` (layanan OS), `mesin` (TCP 5005) | axum, tokio, rusqlite (SQLite bawaan), ureq, jiff, clap, if-addrs, windows-service |
 
+`packages/js` (paket npm `freedom-finger`) memakai API HTTP saja, tanpa dependency dan tanpa
+langkah build: `index.js` (ESM) dan `index.d.ts` ditulis langsung. `start()` menjalankan
+program `freedom-finger` sebagai proses anak; add-on native baru dibuat bila memang perlu.
+
 Crate hanya dipecah bila kebutuhan dependency-nya berbeda. Versi Rust dikunci di
 `rust-toolchain.toml`; lint dan versi dependency bersama diatur di `Cargo.toml` root.
 
@@ -34,11 +38,12 @@ Crate hanya dipecah bila kebutuhan dependency-nya berbeda. Versi Rust dikunci di
 |---|---|---|
 | `store` | Semua SQL | Skema sama dengan versi TypeScript, jadi `absensi.db` lama dipakai tanpa migrasi |
 | `service` | Request mesin, antrean perintah, jam otomatis, cadangan user, endpoint API | Tidak tahu HTTP: masukan `DeviceRequest` atau JSON, keluaran `DeviceReply` atau JSON. Webhook dikembalikan sebagai nilai (`hook`). |
-| `http` | Token Bearer, batas body 32 MB, kirim webhook | `/api/<endpoint>` untuk aplikasi, path lain untuk mesin |
+| `http` | Token Bearer, batas body 32 MB, kirim webhook dan event SSE | `/api/<endpoint>` untuk aplikasi, path lain untuk mesin |
 
 `config` membaca `freedom-finger.env` di folder data dan variabel `FKWEB_*` (daftarnya di
 `README.md`), dan membuat token bila belum ada. `net` mencari mesin di jaringan lokal. Tabel
-endpoint API ada di dokumentasi modul `service.rs`; tabel request HTTP di `http.rs`.
+endpoint API ada di dokumentasi modul `service.rs` dan `docs/openapi.yaml`; tabel request HTTP
+di `http.rs`. Endpoint baru: tambahkan juga ke `openapi.yaml` dan `packages/js`.
 
 ## Decisions
 

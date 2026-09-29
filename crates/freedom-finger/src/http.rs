@@ -6,8 +6,11 @@
 //! | `GET /status.json` | isi halaman status sebagai JSON, tanpa token (tanpa PIN atau data pribadi) |
 //! | `GET /scan.json` | cari mesin di jaringan; hanya dari komputer server sendiri |
 //! | `POST /api/<endpoint>` | aplikasi, dengan token Bearer |
+//! | `GET /api/events` | aplikasi, token Bearer: absen baru dan hasil perintah sebagai SSE (isi sama dengan webhook) |
+//! | `OPTIONS /api/*` | preflight CORS: `/api/*` boleh dipanggil dari origin lain (webview Tauri, browser) |
 //! | `POST` path lain | mesin (FkWeb, `POST /`) |
 
+use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
@@ -15,9 +18,11 @@ use std::time::Duration;
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{ConnectInfo, DefaultBodyLimit, State};
-use axum::http::{Extensions, HeaderMap, Method, StatusCode, Uri, header};
+use axum::http::{Extensions, HeaderMap, HeaderValue, Method, StatusCode, Uri, header};
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{Html, IntoResponse, Response};
 use serde_json::{Value, json};
+use tokio::sync::broadcast::{self, error::RecvError};
 
 use crate::net;
 use crate::service::{DeviceRequest, Error, Service};
@@ -30,6 +35,8 @@ struct App {
     svc: Mutex<Service>,
     token: String,
     agent: ureq::Agent,
+    /// Callback (JSON) untuk semua pendengar `/api/events`.
+    events: broadcast::Sender<String>,
 }
 
 impl App {
@@ -40,7 +47,9 @@ impl App {
 
 pub fn router(svc: Service, token: String) -> Router {
     let agent = ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(30))).build().into();
-    Router::new().fallback(handle).layer(DefaultBodyLimit::max(BODY_LIMIT)).with_state(Arc::new(App { svc: Mutex::new(svc), token, agent }))
+    let events = broadcast::channel(256).0;
+    let app = App { svc: Mutex::new(svc), token, agent, events };
+    Router::new().fallback(handle).layer(DefaultBodyLimit::max(BODY_LIMIT)).with_state(Arc::new(app))
 }
 
 async fn handle(State(app): State<Arc<App>>, method: Method, uri: Uri, ext: Extensions, headers: HeaderMap, body: Bytes) -> Response {
@@ -51,16 +60,33 @@ async fn handle(State(app): State<Arc<App>>, method: Method, uri: Uri, ext: Exte
         (Method::GET, "/status.json") => respond(app.svc().status(), |s| axum::Json(s).into_response()),
         (Method::GET, "/scan.json") if remote.is_some_and(|ip| ip.is_loopback()) => scan(&app, 0).await,
         (Method::GET, "/scan.json") => fail(StatusCode::FORBIDDEN, "pencarian hanya dari komputer server; pakai /api/scan_devices"),
-        (_, path) => match path.strip_prefix("/api/") {
-            Some(ep) => api(&app, ep, &headers, &body).await,
+        (method, path) => match path.strip_prefix("/api/") {
+            Some(ep) => {
+                let mut r = match (method, ep) {
+                    (Method::OPTIONS, _) => StatusCode::NO_CONTENT.into_response(),
+                    (Method::GET, "events") if authorized(&app, &headers) => events(&app),
+                    _ => api(&app, ep, &headers, &body).await,
+                };
+                // aplikasi web/Tauri memanggil dari origin lain; aksesnya tetap dijaga token
+                r.headers_mut().extend([
+                    (header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*")),
+                    (header::ACCESS_CONTROL_ALLOW_HEADERS, HeaderValue::from_static("authorization, content-type")),
+                    (header::ACCESS_CONTROL_ALLOW_METHODS, HeaderValue::from_static("GET, POST")),
+                ]);
+                r
+            }
             None => device(&app, &headers, remote, &body),
         },
     }
 }
 
-async fn api(app: &App, ep: &str, h: &HeaderMap, body: &[u8]) -> Response {
+fn authorized(app: &App, h: &HeaderMap) -> bool {
     let auth = h.get(header::AUTHORIZATION).map_or(&[][..], |v| v.as_bytes());
-    if !same(auth, format!("Bearer {}", app.token).as_bytes()) {
+    same(auth, format!("Bearer {}", app.token).as_bytes())
+}
+
+async fn api(app: &App, ep: &str, h: &HeaderMap, body: &[u8]) -> Response {
+    if !authorized(app, h) {
         return fail(StatusCode::UNAUTHORIZED, "token salah");
     }
     let Some(b) = serde_json::from_slice::<Value>(body).ok().filter(Value::is_object) else {
@@ -72,6 +98,21 @@ async fn api(app: &App, ep: &str, h: &HeaderMap, body: &[u8]) -> Response {
     }
     let r = app.svc().api(ep, &b);
     respond(r, |v| axum::Json(v).into_response())
+}
+
+/// SSE: satu event `data: <JSON callback>` per absen baru atau hasil perintah. Tanpa riwayat: yang
+/// terlewat saat terputus diambil lewat `get_attlog`/`get_result`.
+fn events(app: &App) -> Response {
+    let stream = futures_util::stream::unfold(app.events.subscribe(), |mut rx| async move {
+        let data = match rx.recv().await {
+            Ok(v) => v,
+            // pendengar terlalu lambat (256 event tertinggal): beri tahu supaya mengejar lewat get_attlog
+            Err(RecvError::Lagged(n)) => json!({ "type": "lagged", "missed": n }).to_string(),
+            Err(RecvError::Closed) => return None,
+        };
+        Some((Ok::<_, Infallible>(Event::default().data(data)), rx))
+    });
+    Sse::new(stream).keep_alive(KeepAlive::default()).into_response()
 }
 
 /// Cari mesin di jaringan lokal (beberapa detik, di luar kunci `Service`).
@@ -97,15 +138,17 @@ fn device(app: &App, h: &HeaderMap, remote: Option<std::net::IpAddr>, body: &[u8
     };
     match r {
         Ok(r) => {
-            if let (Some(hook), Some(url)) = (r.hook, webhook) {
-                let agent = app.agent.clone();
-                // dikirim tanpa ditunggu: mesin tidak boleh menunggu penerima webhook
-                tokio::task::spawn_blocking(move || {
-                    let res = agent.post(&url).header("Content-Type", "application/json").send(hook.to_string());
-                    if let Err(e) = res {
-                        eprintln!("webhook gagal: {e}");
-                    }
-                });
+            if let Some(hook) = r.hook.map(|h| h.to_string()) {
+                let _ = app.events.send(hook.clone()); // gagal = belum ada pendengar
+                if let Some(url) = webhook {
+                    let agent = app.agent.clone();
+                    // dikirim tanpa ditunggu: mesin tidak boleh menunggu penerima webhook
+                    tokio::task::spawn_blocking(move || {
+                        if let Err(e) = agent.post(&url).header("Content-Type", "application/json").send(hook) {
+                            eprintln!("webhook gagal: {e}");
+                        }
+                    });
+                }
             }
             let headers = [
                 ("response_code", r.code.to_owned()),

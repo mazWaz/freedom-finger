@@ -56,8 +56,18 @@ api get_result '"trans_id":"<trans_id dari balasan>"'              # pending/sen
 `cloud_id` boleh kosong selama baru satu mesin yang terhubung; bila lebih, isi dengan Cloud
 ID dari `get_devices`. Perintah async langsung membalas `{"success":true,"trans_id":…}`;
 `trans_id` dibuat server bila tidak diisi. Mesin mengambil perintah saat bertanya
-berikutnya (±20 detik sampai 2 menit). Hasilnya diambil lewat `get_result`, atau dikirim ke
-`FKWEB_WEBHOOK`.
+berikutnya (±20 detik sampai 2 menit). Hasilnya diambil lewat `get_result`, dikirim ke
+`FKWEB_WEBHOOK`, dan muncul di `/api/events`.
+
+Absen baru dan hasil perintah bisa diterima langsung tanpa webhook, lewat Server-Sent Events:
+
+```sh
+curl -N http://localhost:8013/api/events -H "Authorization: Bearer $FKWEB_TOKEN"
+# data: {"type":"attlog","cloud_id":"<cloud_id>","data":{"pin":"2","scan":"2026-09-29 08:00","verify":"1","status_scan":"0"}}
+```
+
+Isi tiap event sama dengan callback webhook. Event yang terlewat saat koneksi putus tidak
+dikirim ulang; ambil lewat `get_attlog` atau `get_result`.
 
 ## 4. Everyday tasks
 

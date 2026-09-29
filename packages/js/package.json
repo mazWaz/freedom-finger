@@ -1,0 +1,26 @@
+{
+  "name": "freedom-finger",
+  "version": "0.1.0",
+  "description": "Klien JavaScript untuk Freedom Finger, server absensi lokal tanpa cloud: API bertipe, event realtime, sidecar",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": ["index.js", "index.d.ts"],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node test.mjs"
+  },
+  "keywords": ["absensi", "attendance", "fingerprint", "sse", "sidecar"],
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mazWaz/freedom-finger.git",
+    "directory": "packages/js"
+  }
+}

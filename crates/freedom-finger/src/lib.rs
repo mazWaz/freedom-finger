@@ -13,8 +13,10 @@
 //! # Ok(()) }
 //! ```
 
-use std::future::Future;
+use std::future::{Future, IntoFuture};
 use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
 
 pub mod config;
 pub mod http;
@@ -24,13 +26,23 @@ pub mod store;
 
 use config::{Config, ENV_FILE};
 
-/// Jalankan server sampai `shutdown` selesai.
+/// Jalankan server sampai `shutdown` selesai (lalu paling lama 3 detik untuk request yang masih berjalan).
 pub async fn serve(cfg: Config, shutdown: impl Future<Output = ()> + Send + 'static) -> std::io::Result<()> {
     let store = store::Store::open(&cfg.db).map_err(|e| std::io::Error::other(format!("{}: {e}", cfg.db.display())))?;
     let svc = service::Service::new(store, &cfg);
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", cfg.port)).await?;
     let app = http::router(svc, cfg.token).into_make_service_with_connect_info::<SocketAddr>();
-    axum::serve(listener, app).with_graceful_shutdown(shutdown).await
+    let stop = Arc::new(tokio::sync::Notify::new());
+    let s = stop.clone();
+    let server = axum::serve(listener, app).with_graceful_shutdown(async move {
+        shutdown.await;
+        s.notify_one();
+    });
+    // koneksi /api/events tidak pernah selesai sendiri, jadi setelah diminta berhenti hanya ditunggu sebentar
+    tokio::select! {
+        r = server.into_future() => r,
+        () = async { stop.notified().await; tokio::time::sleep(Duration::from_secs(3)).await } => Ok(()),
+    }
 }
 
 /// Petunjuk untuk pengguna: isian menu mesin, alamat halaman status, letak token.

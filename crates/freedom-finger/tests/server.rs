@@ -68,7 +68,7 @@ impl Sim {
     }
 
     async fn api(&self, ep: &str, mut body: Value) -> Value {
-        body["cloud_id"] = "C26".into();
+        body["cloud_id"] = "MESIN01".into();
         let req = Request::post(format!("/api/{ep}"))
             .header("authorization", format!("Bearer {TOKEN}"))
             .body(HttpBody::from(body.to_string()))
@@ -77,7 +77,7 @@ impl Sim {
     }
 
     async fn dev(&self, code: &str, body: Vec<u8>, extra: &[(&str, &str)]) -> Response<HttpBody> {
-        let mut req = Request::post("/").header("request_code", code).header("dev_id", "C26");
+        let mut req = Request::post("/").header("request_code", code).header("dev_id", "MESIN01");
         for (k, v) in extra {
             req = req.header(*k, *v);
         }
@@ -129,7 +129,7 @@ async fn set_userinfo_password_ascii_di_backup_10() {
     s.result("1", vec![]).await;
     assert_eq!(s.api("get_result", json!({ "trans_id": "1" })).await["data"], json!({ "status": "1" }));
     let hooks = s.hooks(1).await;
-    assert_eq!(hooks, [json!({ "type": "set_userinfo", "cloud_id": "C26", "trans_id": "1", "data": { "status": "1" } })]);
+    assert_eq!(hooks, [json!({ "type": "set_userinfo", "cloud_id": "MESIN01", "trans_id": "1", "data": { "status": "1" } })]);
 }
 
 #[tokio::test]
@@ -244,7 +244,7 @@ async fn realtime_glog_dengan_foto_ke_file_dan_webhook_attlog() {
     assert_eq!(std::fs::read(row["photo"].as_str().unwrap()).unwrap(), jpg);
     assert_eq!(
         s.hooks(1).await,
-        [json!({ "type": "attlog", "cloud_id": "C26",
+        [json!({ "type": "attlog", "cloud_id": "MESIN01",
                  "data": { "pin": "2", "scan": "2026-09-29 14:00", "verify": "4", "status_scan": "0", "photo": row["photo"] } })]
     );
 }
@@ -258,4 +258,41 @@ async fn data_besar_per_blok_digabung() {
     s.dev("realtime_enroll_data", b.to_vec(), &[("blk_no", "0")]).await;
     let bk = s.api("get_backup", json!({ "pin": "5" })).await["data"].clone();
     assert_eq!(B64.decode(bk["template"].as_str().unwrap()).unwrap(), user);
+}
+
+/// Satu event SSE `data: <json>`; kriteria PRD 6.7: tiba kurang dari 1 detik.
+async fn event(body: &mut HttpBody) -> Value {
+    let f = tokio::time::timeout(Duration::from_secs(1), body.frame()).await.expect("event < 1 detik").unwrap().unwrap();
+    let text = String::from_utf8(f.into_data().unwrap().to_vec()).unwrap();
+    serde_json::from_str(text.strip_prefix("data: ").unwrap().trim_end()).unwrap()
+}
+
+#[tokio::test]
+async fn events_sse_absen_baru_dan_hasil_perintah() {
+    let s = sim("sse").await;
+    let req = |auth: String| Request::get("/api/events").header("authorization", auth).body(HttpBody::empty()).unwrap();
+    assert_eq!(s.send(req("Bearer salah".into())).await.status(), 401);
+    let r = s.send(req(format!("Bearer {TOKEN}"))).await;
+    assert_eq!(r.headers()["content-type"], "text/event-stream");
+    assert_eq!(r.headers()["access-control-allow-origin"], "*");
+    let pre = s.send(Request::options("/api/events").body(HttpBody::empty()).unwrap()).await;
+    assert_eq!(
+        (pre.status().as_u16(), &pre.headers()["access-control-allow-headers"]),
+        (204, &"authorization, content-type".parse().unwrap())
+    );
+    let mut body = r.into_body();
+    let g = json!({ "fk_bin_data_lib": "FKDataHS103", "io_mode": 16777216, "io_time": "20260929080000", "log_image": null,
+                    "user_id": "7", "verify_mode": 268435456 });
+    s.dev("realtime_glog", enc(g, vec![]), &[("trans_id", "RTLogSendAction")]).await;
+    assert_eq!(
+        event(&mut body).await,
+        json!({ "type": "attlog", "cloud_id": "MESIN01", "data": { "pin": "7", "scan": "2026-09-29 08:00", "verify": "1", "status_scan": "0" } })
+    );
+    s.api("get_all_pin", json!({ "trans_id": "11" })).await;
+    s.poll(&now14()).await;
+    s.result("11", enc(json!({ "one_user_id_size": 36, "user_id_count": 0 }), vec![])).await;
+    assert_eq!(
+        event(&mut body).await,
+        json!({ "type": "get_all_pin", "cloud_id": "MESIN01", "trans_id": "11", "data": { "total": 0, "pin_arr": [] } })
+    );
 }

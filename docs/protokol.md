@@ -1017,7 +1017,7 @@ Implementasi referensi: modul `freedom_finger_sdk::fkweb` (codec dan pesan) dan 
 | Mengaktifkan | Menu **Jaringan**: Mode **Internet**, Server IP, Server Port, Server Req = Ya. Mode **Lokal** mematikan FkWeb dan menghidupkan TCP 5005. |
 | Arah | **Mesin = klien HTTP.** Mesin mengirim `POST /` ke `http://<Server IP>:<Server Port>/`. Server tidak pernah memulai koneksi. |
 | Gaya | HTTP/1.0, `Connection: close`, satu request per koneksi, `User-Agent: Mozilla/4.0`, `Content-Type: application/octet-stream` |
-| Keamanan | Tanpa TLS dan tanpa autentikasi. Mesin dikenali dari header `dev_id` (= Cloud ID, `C2610000000000AB`). |
+| Keamanan | Tanpa TLS dan tanpa autentikasi. Mesin dikenali dari header `dev_id` (= Cloud ID mesin). |
 | Server resmi | `fdevice.com:8013` / `8014` (fingerspot.io), `fdevice.com:9004` (developer.fingerspot.io) |
 | Kompresi | Mesin mengirim `Accept-Encoding: gzip, deflate`. Server cukup menjawab tanpa kompresi. |
 
@@ -1110,7 +1110,7 @@ Contoh: `io_mode 33554432` = pulang, `verify_mode 268435456` = jari,
 ### 14.7 Contoh pertukaran (daftar jari jarak jauh)
 
 ```
-mesin  → POST /   request_code: receive_cmd   dev_id: C2610000000000AB   trans_id: ReceiveCommandAction
+mesin  → POST /   request_code: receive_cmd   dev_id: <cloud_id>   trans_id: ReceiveCommandAction
                   body: {"fk_name":"Fingerspot","fk_time":"20260929131417","fk_info":{…}}
 server ← 200      response_code: OK   trans_id: 454215   cmd_code: SET_COMMAND
                   body: 41000000 {"cmd":"enter_enroll","param":{"user_id":"2","backup_number":0}} 00

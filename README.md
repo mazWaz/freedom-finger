@@ -40,10 +40,11 @@ Tidak tahu IP mesin? `freedom-finger cari` mencarinya di jaringan lokal.
 | `freedom-finger cari` | Cari mesin di jaringan lokal, beserta petunjuk untuk tiap mesin |
 | `freedom-finger mesin …` | Perintah langsung ke mesin di mode Lokal: `log`, `jam`, `list`, `add`, `edit`, `delete` |
 
-| Crate | Isi |
+| Folder | Isi |
 |---|---|
 | `crates/freedom-finger` | Program dan library server: menerima data mesin, API bergaya developer.fingerspot.io, SQLite |
 | `crates/freedom-finger-sdk` | SDK: protokol TCP 5005 (mode Lokal) dan FkWeb (mode Internet) |
+| `packages/js` | Paket npm `freedom-finger`: klien bertipe, event realtime, menjalankan server di samping aplikasi |
 
 ## Build and test
 
@@ -52,6 +53,7 @@ Butuh [rustup](https://rustup.rs); versi Rust dipasang otomatis dari `rust-toolc
 ```sh
 cargo build --release     # target/release/freedom-finger
 cargo test --workspace    # uji offline, tanpa mesin
+node packages/js/test.mjs # paket JS dengan mesin simulasi
 ```
 
 ## Settings
@@ -69,7 +71,8 @@ menang bila keduanya ada.
 | `FKWEB_WEBHOOK` | - | URL penerima callback |
 | `FKWEB_PHOTOS` | `photos` | Folder foto absen, relatif ke folder data |
 
-Contoh pemakaian API ada di `docs/operasional.md` bagian 3.
+Contoh pemakaian API ada di `docs/operasional.md` bagian 3; spesifikasinya di `docs/openapi.yaml`.
+Absen baru dan hasil perintah juga bisa diterima realtime lewat `GET /api/events` (SSE).
 
 ## Local mode commands
 
@@ -88,6 +91,7 @@ freedom-finger mesin --help    # semua perintah dan variabel FK_*
 |---|---|
 | `docs/arsitektur.md` | Susunan kode, keputusan, cara menambah perintah dan endpoint |
 | `docs/operasional.md` | Menjalankan server, API, pekerjaan sehari-hari, masalah umum |
+| `docs/openapi.yaml` | Spesifikasi API (OpenAPI 3.1) |
 | `docs/protokol.md` | Spesifikasi TCP 5005 dan FkWeb, test vector |
 | `docs/riset.md` | Laporan riset dan riwayat keputusan |
 

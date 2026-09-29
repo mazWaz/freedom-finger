@@ -1,0 +1,483 @@
+openapi: 3.1.0
+info:
+  title: Freedom Finger API
+  version: 0.1.0
+  summary: Server absensi lokal untuk mesin Fingerspot Revo WF-206BNC, tanpa cloud.
+  description: |
+    Bentuk endpoint mengikuti developer.fingerspot.io, ditambah beberapa endpoint (ditandai
+    "tambahan"). Semua endpoint `/api/*` memakai token Bearer (`FKWEB_TOKEN` di
+    `freedom-finger.env`) dan boleh dipanggil dari origin lain (CORS).
+
+    `cloud_id` boleh kosong selama baru satu mesin yang terhubung. Perintah ke mesin bersifat
+    async: balasannya `{success, trans_id}`, lalu hasilnya lewat `get_result`, webhook
+    (`FKWEB_WEBHOOK`), dan `GET /api/events`. Mesin mengambil perintah ±20 detik sampai 2 menit
+    kemudian. Perintah yang sudah terkirim tanpa jawaban selama 5 menit menjadi `timeout`.
+
+    Proyek independen, tidak berafiliasi dengan Fingerspot.
+  license:
+    name: MIT OR Apache-2.0
+    identifier: MIT OR Apache-2.0
+servers:
+  - url: http://localhost:8013
+security:
+  - token: []
+
+paths:
+  /status.json:
+    get:
+      operationId: status
+      summary: Isi halaman status (tanpa token, tanpa PIN atau data pribadi)
+      security: []
+      responses:
+        '200':
+          description: Ringkasan server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: string }
+                  server_ip: { type: [string, 'null'] }
+                  port: { type: integer }
+                  env_file: { type: string }
+                  devices: { type: array, items: { $ref: '#/components/schemas/Device' } }
+                  logs_today: { type: integer }
+                  logs_total: { type: integer }
+
+  /api/events:
+    get:
+      operationId: events
+      summary: Absen baru dan hasil perintah, realtime (Server-Sent Events)
+      description: |
+        Satu event `data: <JSON>` per absen baru atau hasil perintah; isinya sama dengan callback
+        webhook. Komentar `:` tiap 15 detik menjaga koneksi. Event selama koneksi putus tidak
+        dikirim ulang: ambil lewat `get_attlog` atau `get_result`.
+      responses:
+        '200':
+          description: Aliran event
+          content:
+            text/event-stream:
+              schema: { $ref: '#/components/schemas/Event' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /api/get_devices:
+    post:
+      operationId: get_devices
+      summary: Mesin yang pernah terhubung (tambahan)
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        '200': { $ref: '#/components/responses/Devices' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/scan_devices:
+    post:
+      operationId: scan_devices
+      summary: Cari mesin di jaringan lokal lewat TCP 5005, sampai 10 detik (tambahan)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password: { type: integer, description: 'Password komunikasi mesin di mode Lokal, bawaan 0' }
+      responses:
+        '200':
+          description: Alamat yang menjawab
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { const: true }
+                  data: { type: array, items: { $ref: '#/components/schemas/Found' } }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/get_attlog:
+    post:
+      operationId: get_attlog
+      summary: Log absen dari database (tanpa batas 2 hari)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/Target'
+                - type: object
+                  required: [start_date, end_date]
+                  properties:
+                    start_date: { type: string, format: date }
+                    end_date: { type: string, format: date }
+      responses:
+        '200':
+          description: Log urut waktu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { const: true }
+                  data: { type: array, items: { $ref: '#/components/schemas/Attlog' } }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/get_device:
+    post:
+      operationId: get_device
+      summary: Info mesin (firmware, jam mesin, aktivitas terakhir)
+      requestBody: { $ref: '#/components/requestBodies/Target' }
+      responses:
+        '200':
+          description: Info mesin
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { const: true }
+                  data: { $ref: '#/components/schemas/DeviceInfo' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/get_backup:
+    post:
+      operationId: get_backup
+      summary: Cadangan terakhir satu user; `template` untuk memulihkan lewat set_userinfo (tambahan)
+      requestBody: { $ref: '#/components/requestBodies/Pin' }
+      responses:
+        '200':
+          description: Cadangan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { const: true }
+                  data: { $ref: '#/components/schemas/Backup' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/get_result:
+    post:
+      operationId: get_result
+      summary: Status dan hasil perintah async
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/Target'
+                - type: object
+                  required: [trans_id]
+                  properties:
+                    trans_id: { type: string }
+      responses:
+        '200':
+          description: Status perintah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Result' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/get_all_pin:
+    post:
+      operationId: get_all_pin
+      summary: 'Perintah: daftar PIN di mesin. Hasil: `{total, pin_arr}`'
+      requestBody: { $ref: '#/components/requestBodies/Cmd' }
+      responses:
+        '200': { $ref: '#/components/responses/Queued' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/get_userinfo:
+    post:
+      operationId: get_userinfo
+      summary: 'Perintah: data satu user. Hasil: UserInfo'
+      requestBody: { $ref: '#/components/requestBodies/CmdPin' }
+      responses:
+        '200': { $ref: '#/components/responses/Queued' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/set_userinfo:
+    post:
+      operationId: set_userinfo
+      summary: 'Perintah: tulis user; mengganti SELURUH data user. Hasil: `{status: "1"}`'
+      description: Tanpa `template`, jari dan wajah user itu ikut terhapus dari mesin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/Cmd'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: { $ref: '#/components/schemas/UserData' }
+      responses:
+        '200': { $ref: '#/components/responses/Queued' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/delete_userinfo:
+    post:
+      operationId: delete_userinfo
+      summary: 'Perintah: hapus user (cadangannya tetap di database). Hasil: `{status: "1"}`'
+      requestBody: { $ref: '#/components/requestBodies/CmdPin' }
+      responses:
+        '200': { $ref: '#/components/responses/Queued' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/reg_online:
+    post:
+      operationId: reg_online
+      summary: 'Perintah: buka layar daftar jari/wajah di mesin. Hasil: `{status: "1"}`'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/Cmd'
+                - type: object
+                  required: [pin, verification]
+                  properties:
+                    pin: { $ref: '#/components/schemas/Pin' }
+                    verification: { type: integer, minimum: 0, maximum: 12, description: '0–9 jari, 10 password, 11 kartu, 12 wajah' }
+      responses:
+        '200': { $ref: '#/components/responses/Queued' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/set_time:
+    post:
+      operationId: set_time
+      summary: 'Perintah: setel jam mesin (jam dihitung saat dikirim). Hasil: `{status: "1"}`'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/Cmd'
+                - type: object
+                  properties:
+                    timezone: { type: string, example: Asia/Jakarta, description: Bawaan FKWEB_TZ }
+      responses:
+        '200': { $ref: '#/components/responses/Queued' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/restart_device:
+    post:
+      operationId: restart_device
+      summary: 'Perintah: restart mesin. Mesin tidak menjawab; status langsung `done`, result_code `NO_REPLY`'
+      requestBody: { $ref: '#/components/requestBodies/Cmd' }
+      responses:
+        '200': { $ref: '#/components/responses/Queued' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /api/sync_attlog:
+    post:
+      operationId: sync_attlog
+      summary: 'Perintah: tarik semua log mesin ke database; log ganda diabaikan (tambahan). Hasil: `{log_count, one_log_size, added}`'
+      requestBody: { $ref: '#/components/requestBodies/Cmd' }
+      responses:
+        '200': { $ref: '#/components/responses/Queued' }
+        default: { $ref: '#/components/responses/Error' }
+
+components:
+  securitySchemes:
+    token:
+      type: http
+      scheme: bearer
+      description: FKWEB_TOKEN di freedom-finger.env (dibuat otomatis)
+
+  requestBodies:
+    Empty:
+      content:
+        application/json:
+          schema: { type: object }
+    Target:
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Target' }
+    Pin:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Target'
+              - type: object
+                required: [pin]
+                properties:
+                  pin: { $ref: '#/components/schemas/Pin' }
+    Cmd:
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Cmd' }
+    CmdPin:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Cmd'
+              - type: object
+                required: [pin]
+                properties:
+                  pin: { $ref: '#/components/schemas/Pin' }
+
+  responses:
+    Error:
+      description: Token salah (401), input salah (400), endpoint tidak ada (404), atau gagal (500)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success: { const: false }
+              message: { type: string }
+    Devices:
+      description: Daftar mesin
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success: { const: true }
+              data: { type: array, items: { $ref: '#/components/schemas/Device' } }
+    Queued:
+      description: Perintah masuk antrean mesin
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success: { const: true }
+              trans_id: { type: string }
+
+  schemas:
+    Target:
+      type: object
+      properties:
+        cloud_id: { type: string, maxLength: 18, description: Boleh kosong bila baru satu mesin yang terhubung }
+    Cmd:
+      allOf:
+        - $ref: '#/components/schemas/Target'
+        - type: object
+          properties:
+            trans_id: { type: string, pattern: '^[A-Za-z0-9_-]{1,32}$', description: Dibuat server bila kosong }
+    Pin:
+      type: string
+      pattern: '^[0-9]{1,22}$'
+    CommandType:
+      type: string
+      enum: [get_all_pin, get_userinfo, set_userinfo, delete_userinfo, reg_online, set_time, restart_device, sync_attlog]
+    Privilege:
+      type: string
+      enum: ['1', '2', '3']
+      description: 1 user, 2 admin, 3 subadmin
+    Device:
+      type: object
+      properties:
+        cloud_id: { type: string }
+        device_name: { type: [string, 'null'] }
+        ip: { type: [string, 'null'] }
+        last_activity: { type: [string, 'null'], description: 'YYYY-MM-DD hh:mm:ss, jam server' }
+        connected: { type: boolean, description: Mesin bertanya dalam 3 menit terakhir }
+    DeviceInfo:
+      type: object
+      properties:
+        cloud_id: { type: string }
+        device_name: { type: [string, 'null'] }
+        last_activity: { type: [string, 'null'] }
+        fk_time: { type: [string, 'null'], description: Jam mesin saat terakhir bertanya }
+        info: { type: [object, 'null'] }
+        webhook_url: { type: [string, 'null'] }
+    Found:
+      type: object
+      properties:
+        ip: { type: string }
+        mode: { type: string, enum: [lokal, ditolak, diam], description: 'diam = kemungkinan mesin di mode Internet' }
+        cloud_id: { type: [string, 'null'], description: Terisi bila mesin ini sudah terhubung ke server }
+        note: { type: string, description: Petunjuk untuk pengguna }
+    Attlog:
+      type: object
+      properties:
+        pin: { type: string }
+        scan_date: { type: string, example: '2026-09-29 08:00:00' }
+        verify: { type: integer, description: '1 jari, 2 password, 3 kartu, 4 wajah' }
+        status_scan: { type: integer, description: '0 masuk, 1 pulang' }
+        photo: { type: string, description: 'Path file foto di server, bila ada' }
+    UserInfo:
+      type: object
+      properties:
+        pin: { type: string }
+        name: { type: string }
+        privilege: { $ref: '#/components/schemas/Privilege' }
+        finger: { type: string, description: Jumlah jari }
+        face: { type: string }
+        password: { type: string }
+        rfid: { type: string }
+        vein: { type: string }
+        template: { type: string, contentEncoding: base64, description: Data user lengkap; kirim lagi di set_userinfo }
+    UserData:
+      type: object
+      required: [pin]
+      properties:
+        pin: { $ref: '#/components/schemas/Pin' }
+        name: { type: string }
+        privilege: { $ref: '#/components/schemas/Privilege' }
+        password: { type: string, pattern: '^[0-9]{0,10}$' }
+        rfid: { type: string, pattern: '^[0-9]{0,20}$' }
+        template: { type: string, contentEncoding: base64, description: Dari get_userinfo atau get_backup }
+    Backup:
+      type: object
+      properties:
+        pin: { type: string }
+        name: { type: string }
+        privilege: { $ref: '#/components/schemas/Privilege' }
+        updated: { type: string }
+        template: { type: string, contentEncoding: base64 }
+    Result:
+      type: object
+      properties:
+        success: { const: true }
+        trans_id: { type: string }
+        type: { $ref: '#/components/schemas/CommandType' }
+        cmd_code: { type: string }
+        status: { type: string, enum: [pending, sent, done, timeout] }
+        result_code: { type: [string, 'null'], description: 'OK, NO_REPLY (restart_device), atau kode error mesin' }
+        data:
+          description: Hasil; bentuknya per perintah (lihat ringkasan endpoint)
+          anyOf: [{ $ref: '#/components/schemas/UserInfo' }, { type: object }, { type: 'null' }]
+        created: { type: [string, 'null'] }
+        sent: { type: [string, 'null'] }
+        done: { type: [string, 'null'] }
+    Event:
+      description: Isi sama dengan callback webhook
+      oneOf:
+        - type: object
+          title: attlog
+          required: [type]
+          properties:
+            type: { const: attlog }
+            cloud_id: { type: string }
+            data:
+              type: object
+              properties:
+                pin: { type: string }
+                scan: { type: string, example: '2026-09-29 08:00' }
+                verify: { type: string }
+                status_scan: { type: string }
+                photo: { type: string }
+        - type: object
+          title: hasil perintah
+          required: [type, trans_id]
+          properties:
+            type: { $ref: '#/components/schemas/CommandType' }
+            cloud_id: { type: string }
+            trans_id: { type: string }
+            data: {}
+        - type: object
+          title: lagged
+          description: Pendengar terlalu lambat; ambil yang terlewat lewat get_attlog
+          required: [type]
+          properties:
+            type: { const: lagged }
+            missed: { type: integer }

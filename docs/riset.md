@@ -539,7 +539,7 @@ Spesifikasi protokol FkWeb ada di `protokol.md` bagian 14. Panduan operasional a
 | **developer.fingerspot.io (SDK Online)** | **`fdevice.com:9004`** | Tertulis di portal: Mesin Absensi → Detail |
 
 - Ketiganya server Sails.js yang berbicara FkWeb. `fdevice.com` = `3.1.174.198`.
-- Cloud ID = `dev_id` = `C2610000000000AB`.
+- Cloud ID = `dev_id`.
 - Platform developer tidak melihat mesin yang terhubung ke port 8013/8014
   (`get_device` menjawab `last_activity: N/A`), sehingga perintah API-nya hanya tertunda.
 
