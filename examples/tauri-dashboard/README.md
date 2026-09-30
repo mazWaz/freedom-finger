@@ -10,18 +10,18 @@ rekap bulanan, izin dan koreksi absen, perawatan mesin, export Excel, backup) da
 
 | Tab | Isi |
 |---|---|
-| Hari ini | Sebaran jam scan (arahkan kursor ke titik untuk nama; garis jam masuk/pulang semua jadwal). Papan absen: satu kartu per karyawan (tepat waktu, terlambat, izin, belum datang), bisa disaring per status, dicari, dan dibagi per halaman. Kartu dibuka untuk mencatat izin atau koreksi absen dengan nama dan tanggal sudah terisi. Semua scan hari ini secara realtime (terlipat, dengan cari dan halaman); isian menu mesin |
+| Hari ini | Sebaran jam scan (arahkan kursor ke titik untuk nama; garis jam masuk/pulang semua jadwal). Papan absen: satu kartu per karyawan (tepat waktu, terlambat, izin, belum datang), bisa disaring per status, dicari, dan dibagi per halaman. Kartu dibuka untuk rincian (dengan foto karyawan bila mesin pernah mengirimnya) dan untuk mencatat izin atau koreksi absen dengan nama dan tanggal sudah terisi. Semua scan hari ini secara realtime (terlipat, dengan cari dan halaman); isian menu mesin |
 | Riwayat | Per hari: daftar hadir, karyawan ke bawah dan tanggal ke samping, sel berwarna menurut hitungan Rekap (terlambat, izin/sakit/cuti/dinas, tidak masuk, libur, tanpa absen pulang, koreksi manual). Semua scan: tiap scan per hari, termasuk koreksi manual; pilih mesin. Keduanya: rentang tanggal dengan pilihan cepat (1 minggu, 1–6 bulan, …), cari nama atau PIN, export Excel/CSV dan cetak |
 | Rekap | Per karyawan per bulan: strip harian (hadir, terlambat, alpa, izin, libur), hadir, terlambat, pulang cepat, lupa absen pulang, alpa, izin/sakit/cuti/dinas, jam kerja, lembur; klik untuk rincian per hari |
-| Izin & koreksi | Izin, sakit, cuti, dinas luar (satu hari atau rentang, dengan keterangan); koreksi absen untuk yang lupa scan (jam dan alasan wajib). Form di panel samping, juga dari kartu di Hari ini. Bisa diubah dan dihapus |
-| Karyawan | Ambil data karyawan dari mesin; nama lengkap, departemen, jadwal, dan ikut rekap |
+| Izin & koreksi | Izin, sakit, cuti, dinas luar (satu hari atau rentang, dengan keterangan); koreksi absen untuk yang lupa scan (jam dan alasan wajib). Form di modal, juga dari kartu di Hari ini. Bisa diubah dan dihapus |
+| Karyawan | Ambil data karyawan dari mesin; tambah karyawan ke mesin (PIN dicek dulu di mesin supaya tidak menimpa orang lain); nama lengkap, departemen, jadwal, dan ikut rekap. Per karyawan (tombol bergambar mesin di kolom Terdaftar di mesin): lihat yang terdaftar (jari, wajah, kartu, password); ubah nama di mesin (maks. 15 huruf) dan hak admin mesin; daftarkan wajah, jari, kartu (ditempelkan di mesin), atau password (diketik di mesin), dengan layar daftar yang terbuka sendiri di mesin; hapus dari mesin (riwayat absen tetap ada, hari sesudahnya tidak dihitung alpa, PIN-nya tidak dipakai lagi). Karyawan yang dihapus bisa dipulihkan dari cadangan: nama, hak akses, jari, wajah, kartu, password, dan foto kembali ke mesin (PIN dicek dulu di mesin) |
 | Mesin | Per mesin: Cloud ID, IP, terakhir aktif, jam mesin dibanding jam PC, firmware; setel jam, tarik ulang semua log, restart (perintah yang menunggu mesin tetap tampil setelah aplikasi dibuka ulang); cari mesin di jaringan |
-| Jam kerja | Jam kerja per hari (jadwal utama dan jadwal lain, mis. paruh waktu), toleransi terlambat, lembur, jarak scan pulang |
+| Jam kerja | Jam kerja per hari (jadwal utama dan jadwal lain, mis. paruh waktu, masing-masing dengan warna yang tampil sebagai tanda jadwal di Hari ini) dengan sakelar lembur per hari (hari kerja: sesudah jam pulang; hari libur: seluruh jam kerja) dan lembur maksimal per hari (jam; kosong = tanpa batas), toleransi terlambat, batas menit lembur, jarak scan pulang |
 | Hari libur | Tanggal libur kantor dan keterangannya |
 | Backup | Folder backup, backup sekarang, pulihkan dari backup |
 | Pengaturan | Nama kantor dan kata sandi |
 
-Aturan rekap: scan pertama = masuk, scan terakhir = pulang bila minimal 60 menit sesudahnya
+Aturan rekap: karyawan dihitung mulai hari pertama ada (scan pertama, ditambahkan lewat aplikasi, izin, atau koreksi), jadi karyawan baru tidak alpa sebelum mulai; scan pertama = masuk, scan terakhir = pulang bila minimal 60 menit sesudahnya
 (tombol Masuk/Pulang di mesin diabaikan); menit terlambat dihitung dari jam masuk; hari ini
 belum dihitung; hari dengan izin/sakit/cuti/dinas bukan alpa; koreksi manual dihitung seperti scan. Semua aturan
 ada di `src/hitung-rekap.js` dan diuji dengan `npm test`.
@@ -35,12 +35,16 @@ Aplikasi dirancang untuk PC yang hanya menyala di jam kantor, bukan server 24 ja
 | Jalan otomatis | Saat login, aplikasi mulai di tray tanpa jendela (build rilis) |
 | Tutup jendela | Jendela disembunyikan ke tray; server tetap menerima absen. Keluar lewat menu tray |
 | Dibuka dua kali | Jendela yang sudah ada dimunculkan; tidak ada server kedua |
+| Ukuran layar | Jendela dibuka 90% layar, di tengah; layar kecil (720p, 1366×768) penuh. Layar 4K dengan skala 100%: tampilan diperbesar 1,5×. Ctrl + / Ctrl − / Ctrl 0 untuk memperbesar, memperkecil, dan mengembalikan |
 | Absen selama PC mati | Mesin menyimpannya. Saat aplikasi start, `sync_attlog` menarik semua log dalam ±2 menit |
 | Isian menu mesin | Ditampilkan di bawah daftar absen selama ada mesin yang belum/tidak terhubung, dengan IP PC ini dan port |
 | IP PC berubah | Peringatan bila mesin tidak lagi terhubung dan IP berbeda dari saat terakhir terhubung |
 | Firewall Windows | Installer (NSIS, butuh admin) membuka TCP 8013 untuk jaringan lokal; uninstall menutupnya |
 | Backup | Otomatis sekali sehari saat aplikasi pertama kali hidup, ke folder `Freedom Finger Backup` di folder pengguna (bukan Dokumen, yang sering disinkronkan OneDrive); 30 terakhir disimpan |
 | Kata sandi | Dibuat saat aplikasi pertama kali dibuka; diminta setiap aplikasi dibuka, lewat tombol Kunci aplikasi, dan setelah jendela tersembunyi lebih dari 5 menit. Selama terkunci server tetap menerima absen. Lupa kata sandi: tutup aplikasi, hapus bagian `auth` di `aplikasi.json`, lalu buka lagi dan buat kata sandi baru |
+| Ubah nama atau admin | Data terbaru diambil dulu dari mesin (`get_userinfo`), lalu dikirim ulang bersama nama dan hak akses baru, karena `set_userinfo` mengganti seluruh data user. Sesudahnya dibaca lagi untuk memastikan jari, wajah, kartu, dan password tetap. Nama lengkap di aplikasi tidak berubah |
+| Menunggu mesin | Selama perintah menunggu jawaban mesin (tab Karyawan dan Mesin, juga Cari mesin), layar tunggu dengan spinner, langkah yang sedang berjalan, dan lama menunggu mengunci seluruh halaman; Esc tidak menutupnya. Ambil data dari mesin tidak mengunci halaman, karena bisa belasan menit dan tetap berjalan di latar |
+| Mesin menolak atau terputus | Layar tunggu hilang, lalu pesannya tampil di modal: mesin sedang dipakai (menu terbuka), menolak isi perintah, atau terputus (±3–4 menit tanpa kabar). Perintah untuk mesin yang terputus tetap mengantre di server dan dijalankan saat mesin tersambung lagi |
 | Pulihkan | Database diganti saat aplikasi mulai ulang; kata sandi yang sekarang tetap dipakai; data sebelumnya disimpan sebagai `absensi-sebelum-pulih.db` di folder data |
 
 Data ada di folder data aplikasi, misalnya `%APPDATA%\io.github.mazwaz.freedom-finger-dashboard`

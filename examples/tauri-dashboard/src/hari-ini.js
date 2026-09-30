@@ -4,14 +4,15 @@
 // dengan cari dan halaman), status mesin, isian menu mesin, dan peringatan bila IP PC ini berubah.
 // Koreksi absen hari ini ikut dihitung seperti scan, sama dengan Rekap.
 import { invoke } from '@tauri-apps/api/core';
+import { FingerprintPattern, createElement } from 'lucide';
 import {
-  $, data, dayName, deptOf, devices, esc, hhmm, inRecap, knownPins, logs, monthName, nameOf, openDrawer, paginate, period, port, scheduleOf, today,
+  $, backups, colorOf, data, dayName, deptOf, devices, esc, hhmm, inRecap, knownPins, logs, monthName, nameOf, openDrawer, paginate, period, port,
+  scheduleName, scheduleOf, scheduleTag, today,
 } from './app.js';
-import { correctionScans, minutes, weekday } from './hitung-rekap.js';
+import { correctionScans, minutes, scanRoles, userPhoto, weekday } from './hitung-rekap.js';
 import { openForm } from './izin.js';
 import { LABEL } from './rekap.js';
 
-export const STATUS = ['Masuk', 'Pulang'];
 export const VERIFY = { 1: 'Jari', 2: 'Password', 3: 'Kartu', 4: 'Wajah' };
 const KIND = { belum: 'Belum datang', telat: 'Terlambat', izin: 'Izin', tepat: 'Tepat waktu', luar: 'Di luar jadwal' };
 
@@ -96,6 +97,7 @@ export async function show() {
 function table() {
   const q = $('daftar-cari').value.trim().toLowerCase();
   const found = rows.filter((l) => matches(l.pin, q));
+  const roles = scanRoles(rows, data.schedule.minGap); // bukan tombol mesin: sebelum 09:00 mesin selalu mencatat "Pulang"
   $('jumlah').textContent = rows.length ? `(${rows.length})` : '';
   const [list, n] = paginate($('daftar-hal'), found, page.rows, PER_PAGE.rows, (n) => {
     page.rows = n;
@@ -105,7 +107,7 @@ function table() {
   $('daftar').innerHTML = list
     .map((l) => `<tr${freshRows.has(scanKey(l)) ? ' class="baru"' : ''}><td>${l.scan_date.slice(11, 16)}</td>` +
       `<td>${esc(nameOf(l.pin))}</td><td>${esc(l.pin)}</td>` +
-      `<td>${l.manual ? '' : (STATUS[l.status_scan] ?? esc(l.status_scan))}</td><td>${l.manual ? 'Manual' : (VERIFY[l.verify] ?? esc(l.verify))}</td></tr>`)
+      `<td>${roles.get(`${l.pin} ${l.scan_date}`) ?? '<span class="redup">–</span>'}</td><td>${l.manual ? 'Manual' : (VERIFY[l.verify] ?? esc(l.verify))}</td></tr>`)
     .join('') || `<tr><td colspan="5" class="muted">${rows.length ? 'Tidak ada scan yang cocok dengan pencarian.' : 'Belum ada scan hari ini.'}</td></tr>`;
 }
 
@@ -182,8 +184,9 @@ function card(p, fresh) {
     p.kind === 'belum' && `jadwal masuk ${p.shift.start}`,
   ].filter(Boolean).join(', ');
   return `<button class="kartu ${p.kind}${fresh ? ' baru' : ''}" data-pin="${esc(p.pin)}" ` +
-    `aria-label="${esc(nameOf(p.pin))}: ${esc([jam, status, ket].filter(Boolean).join(', '))}. Buka rincian">` +
-    `<span class="nama">${esc(nameOf(p.pin))}</span>` +
+    `aria-label="${esc(nameOf(p.pin))}: ${esc([jam, status, ket, data.schedules.length && `jadwal ${scheduleName(p.pin)}`].filter(Boolean).join(', '))}. ` +
+    'Buka rincian">' +
+    `<span class="nama-baris"><span class="nama">${esc(nameOf(p.pin))}</span>${scheduleTag(p.pin)}</span>` +
     `<span class="jam">${esc(jam)}${status ? `<span class="status">${status}</span>` : ''}</span>` +
     (ket ? `<span class="ket">${esc(ket)}</span>` : '') + '</button>';
 }
@@ -202,8 +205,9 @@ function person(pin) {
   }[p.kind]();
   const via = (s) => (s.manual ? `koreksi manual${s.reason ? `: ${s.reason}` : ''}` : (VERIFY[s.verify] ?? 'scan mesin'));
   $('laci-orang').innerHTML =
-    `<p class="kartu-status ${p.kind}"><b>${esc(status)}</b></p>` +
-    `<p class="muted">${p.shift ? `Jadwal hari ini ${p.shift.start}–${p.shift.end}` : 'Tidak ada jadwal kerja hari ini'}</p>` +
+    `<div class="orang-kepala"><div class="foto-orang" data-pin="${esc(pin)}" title="Belum ada foto dari mesin">${NO_PHOTO}</div>` +
+    `<div><p class="kartu-status ${p.kind}"><b>${esc(status)}</b></p>` +
+    `<p class="muted">${scheduleTag(pin)} ${p.shift ? `Jadwal hari ini ${p.shift.start}–${p.shift.end}` : 'Tidak ada jadwal kerja hari ini'}</p></div></div>` +
     (p.scans.length
       ? `<ul class="scan-list">${p.scans.map((s) => `<li><b>${hhmm(s.m)}</b><span>${esc(via(s))}</span></li>`).join('')}</ul>`
       : '<p class="muted">Belum ada scan hari ini.</p>') +
@@ -218,8 +222,35 @@ function person(pin) {
     if (a === 'koreksi') openForm('corrections', { pin, date: day });
   };
   openDrawer('laci-orang', nameOf(pin), [`PIN ${pin}`, deptOf(pin)].filter(Boolean).join(', '));
+  photoUrl(pin).then((url) => {
+    const box = $('laci-orang').querySelector(`.foto-orang[data-pin="${CSS.escape(pin)}"]`); // laci belum pindah ke orang lain
+    if (!url || !box) return;
+    box.title = '';
+    box.innerHTML = `<img src="${url}" alt="Foto ${esc(nameOf(pin))}">`;
+  });
   $('laci-orang').querySelector('.tindakan .utama').focus();
 }
+
+/**
+ * Foto karyawan yang dikirim mesin bersama data user (saat didaftarkan/diubah di mesin), dari cadangan
+ * di database server (`get_backup`); mesin ini tidak mengirim foto saat absen. Yang sudah ketemu
+ * disimpan; yang belum ada dicoba lagi saat laci dibuka lagi (mungkin baru diambil dari mesin).
+ */
+const photos = new Map(); // PIN -> blob URL
+const NO_PHOTO = createElement(FingerprintPattern).outerHTML; // pengganti foto: sidik jari, ikon yang sama dengan menu Mesin
+async function photoUrl(pin) {
+  if (photos.has(pin)) return photos.get(pin);
+  const jpg = (await backups(pin)).map((b) => userPhoto(b.body)).find(Boolean);
+  if (jpg) photos.set(pin, URL.createObjectURL(new Blob([jpg], { type: 'image/jpeg' })));
+  return photos.get(pin) ?? null;
+}
+
+/** Garis putus-putus, bergantian warna tiap jadwal yang memakai jam itu (satu jadwal = satu warna). */
+const dashes = (colors) => `repeating-linear-gradient(to bottom, ${colors
+  .map((c, i) => `${c} ${i * 7}px ${i * 7 + 4}px, transparent ${i * 7 + 4}px ${(i + 1) * 7}px`).join(', ')})`;
+/** Bidang toleransi terlambat, dibagi rata atas-bawah bila jam masuknya dipakai beberapa jadwal. */
+const bands = (colors) => `linear-gradient(to bottom, ${colors
+  .map((c, i) => `color-mix(in srgb, ${c} 14%, transparent) ${(i / colors.length) * 100}% ${((i + 1) / colors.length) * 100}%`).join(', ')})`;
 
 /**
  * Pita jam masuk: satu titik per scan di garis waktu hari ini. Scan pertama tiap orang = titik penuh
@@ -231,8 +262,9 @@ function ribbon(scans, day, late) {
   const pita = $('pita');
   $('pita-legenda').hidden = !scans.size;
   $('pita-kosong').hidden = !!scans.size;
-  const shifts = data.holidays.some((h) => h.date === day) ? [] : [{ name: 'Utama', days: data.schedule.days }, ...data.schedules]
-    .filter((s) => s.days[weekday(day)]).map((s) => ({ name: s.name, ...s.days[weekday(day)] }));
+  const shifts = data.holidays.some((h) => h.date === day) ? [] : [{ ...data.schedule, name: 'Utama' }, ...data.schedules]
+    // warna jadwal hanya bila ada jadwal lain; satu jadwal saja = hijau seperti biasa
+    .filter((s) => s.days[weekday(day)]).map((s) => ({ name: s.name, color: data.schedules.length ? colorOf(s) : 'var(--hijau)', ...s.days[weekday(day)] }));
   const starts = [...new Set(shifts.map((s) => s.start))];
   const all = [...scans.values()].flat();
   const now = new Date().getHours() * 60 + new Date().getMinutes();
@@ -241,13 +273,17 @@ function ribbon(scans, day, late) {
   const x = (m) => `${(((m - from) / (to - from)) * 100).toFixed(2)}%`;
   // satu garis per jam masuk/pulang; label yang saling menimpa ditumpuk ke atas, dekat tepi kanan dibalik ke kiri
   const lines = [['Masuk', 'start'], ['Pulang', 'end']].flatMap(([kind, key]) => [...new Set(shifts.map((s) => s[key]))].map((t) => {
-    const names = shifts.filter((s) => s[key] === t).map((s) => s.name);
-    return { m: minutes(t), text: `${kind} ${t}${names.length < shifts.length ? ` (${names.join(', ')})` : ''}` };
+    const used = shifts.filter((s) => s[key] === t);
+    const names = used.map((s) => s.name);
+    // titik warna jadwal (hanya bila ada jadwal lain), sama dengan tanda jadwal di kartu
+    const dots = data.schedules.length ? used.map((s) => `<i style="--warna: ${s.color}"></i>`).join('') : '';
+    const colors = used.map((s) => s.color);
+    return { m: minutes(t), dots, colors, text: `${kind} ${t}${names.length < shifts.length ? ` (${names.join(', ')})` : ''}` };
   })).sort((a, b) => a.m - b.m);
   const labelEnds = [];
   for (const l of lines) {
     const at = (l.m - from) / (to - from);
-    const w = (l.text.length * 6.6 + 10) / (pita.clientWidth || 700); // perkiraan lebar label, sebagai bagian pita
+    const w = (l.text.length * 6.6 + (l.dots.match(/<i/g)?.length ?? 0) * 10 + 10) / (pita.clientWidth || 700); // perkiraan lebar label
     l.flip = at + w > 1;
     const [a, b] = l.flip ? [at - w, at] : [at, at + w];
     l.row = labelEnds.findIndex((end) => end < a);
@@ -268,8 +304,10 @@ function ribbon(scans, day, late) {
   const hours = [];
   for (let h = from; h <= to; h += 120) hours.push(h);
   pita.innerHTML =
-    starts.map((t) => `<div class="toleransi" style="left: ${x(minutes(t))}; width: ${x(from + data.schedule.tolerance)}"></div>`).join('') +
-    lines.map((l) => `<div class="garis${l.flip ? ' balik' : ''}" style="left: ${x(l.m)}; top: ${-22 - l.row * 15}px"><span>${esc(l.text)}</span></div>`).join('') +
+    starts.map((t) => `<div class="toleransi" style="left: ${x(minutes(t))}; width: ${x(from + data.schedule.tolerance)}; ` +
+      `background: ${bands(shifts.filter((s) => s.start === t).map((s) => s.color))}"></div>`).join('') +
+    lines.map((l) => `<div class="garis${l.flip ? ' balik' : ''}" style="left: ${x(l.m)}; top: ${-22 - l.row * 15}px; ` +
+      `--c: ${l.colors.length === 1 ? l.colors[0] : 'var(--redup)'}; background: ${dashes(l.colors)}"><span>${l.dots}${esc(l.text)}</span></div>`).join('') +
     (now >= from && now <= to ? `<div class="sekarang" style="left: ${x(now)}" title="Sekarang ${hhmm(now)}"></div>` : '') +
     dots.map((d) => {
       const at = (d.m - from) / (to - from); // label dekat tepi: rata ke dalam supaya tidak terpotong

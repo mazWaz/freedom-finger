@@ -10,7 +10,7 @@ import {
   Printer, Settings, Sheet, UserPlus, Users,
   createIcons,
 } from 'lucide';
-import { $, api, bus, closeDrawer, connect, data, devices, emit, listen, loadData, loadDevices, loadUsers } from './app.js';
+import { $, api, bus, closeDrawer, connect, data, devices, emit, listen, loadData, loadDevices, loadFirstScans, loadUsers, noteScan } from './app.js';
 import * as hariIni from './hari-ini.js';
 import * as izin from './izin.js';
 import * as karyawan from './karyawan.js';
@@ -44,13 +44,12 @@ function open(name) {
   TABS[name].show('open');
 }
 
-/** Sidebar: nama kantor dan status mesin, terlihat dari semua tab. */
+/** Sidebar: nama kantor dan jumlah mesin terhubung dari semua mesin (1/2), terlihat dari semua tab. */
 function sidebar() {
   $('nama-kantor').textContent = data.office;
   const on = devices.filter((d) => d.connected).length;
-  $('status-samping').className = !devices.length ? 'redup' : on ? 'ok' : 'off';
-  $('status-samping').textContent = !devices.length ? 'Belum ada mesin' : on === devices.length
-    ? `${on === 1 ? 'Mesin' : `${on} mesin`} terhubung` : `${devices.length - on} dari ${devices.length} mesin terputus`;
+  $('status-samping').className = !devices.length ? 'redup' : on === devices.length ? 'ok' : 'off';
+  $('status-samping').textContent = devices.length ? `${on}/${devices.length} mesin terhubung` : 'Belum ada mesin';
 }
 
 async function main() {
@@ -68,6 +67,7 @@ async function main() {
     }
   }
   await loadUsers();
+  await loadFirstScans().catch(() => {}); // gagal: rekap tanpa tanggal mulai karyawan
   for (const t of new Set(Object.values(TABS))) t.init?.();
   for (const n of Object.keys(TABS)) $(`tab-${n}`).onclick = () => open(n);
   $('laci-tutup').onclick = closeDrawer;
@@ -84,6 +84,8 @@ async function main() {
   bus.addEventListener('data', sidebar);
   sidebar();
   listen((ev) => {
+    if (ev.type === 'attlog') noteScan(ev.data.pin, ev.data.scan.slice(0, 10));
+    if (ev.type === 'sync_attlog') loadFirstScans().catch(() => {}); // log lama yang baru ditarik: mungkin ada scan pertama baru
     if (ev.type === 'attlog' || ev.type === 'sync_attlog') emit('logs'); // absen baru, atau hasil penyusulan
     if (ev.type === 'get_userinfo') loadUsers();
     karyawan.onEvent(ev);

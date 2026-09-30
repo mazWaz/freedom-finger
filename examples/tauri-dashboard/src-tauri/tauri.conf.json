@@ -13,9 +13,12 @@
     "windows": [
       {
         "title": "Freedom Finger",
-        "width": 1000,
-        "height": 700,
-        "visible": false
+        "width": 1200,
+        "height": 760,
+        "visible": false,
+        "minWidth": 900,
+        "minHeight": 560,
+        "zoomHotkeysEnabled": true
       }
     ],
     "security": {

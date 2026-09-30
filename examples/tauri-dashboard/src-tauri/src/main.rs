@@ -20,7 +20,7 @@ use rust_xlsxwriter::{Format, Workbook};
 use serde_json::Value;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, State, WindowEvent};
+use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, State, WindowEvent};
 use tauri_plugin_autostart::ManagerExt;
 
 /// Argumen saat dijalankan otomatis ketika login: mulai di tray, tanpa jendela.
@@ -292,6 +292,32 @@ fn print(w: tauri::WebviewWindow) -> Res<()> {
     w.print().map_err(err)
 }
 
+/// Ukuran awal jendela menurut layar, 720p sampai 4K. Layar kecil (area kerja kurang dari 1400x800 titik,
+/// mis. 1280x720 dan 1366x768): seluruh area kerja. Lebih besar: 90%, di tengah. 4K dengan skala 100% (area
+/// kerja minimal 3200x1700 titik): tampilan diperbesar 1,5x supaya tulisan tidak terlalu kecil. Pengguna
+/// tetap bisa mengubahnya dengan Ctrl + / Ctrl - / Ctrl 0 (`zoomHotkeysEnabled`).
+fn fit_to_screen(w: &tauri::WebviewWindow) -> tauri::Result<()> {
+    let Some(m) = w.current_monitor()?.or(w.primary_monitor()?) else { return Ok(()) };
+    let (scale, area) = (m.scale_factor(), m.work_area());
+    let (width, height) = (f64::from(area.size.width) / scale, f64::from(area.size.height) / scale);
+    let part = if width < 1400.0 || height < 800.0 { 1.0 } else { 0.9 };
+    let (ow, oh) = ((f64::from(area.size.width) * part) as u32, (f64::from(area.size.height) * part) as u32);
+    // ukuran yang diatur = isi jendela; bingkai dan judul jendela dikurangkan supaya pas di area kerja
+    let (outer, inner) = (w.outer_size()?, w.inner_size()?);
+    w.set_size(PhysicalSize::new(
+        ow.saturating_sub(outer.width.saturating_sub(inner.width)),
+        oh.saturating_sub(outer.height.saturating_sub(inner.height)),
+    ))?;
+    w.set_position(PhysicalPosition::new(
+        area.position.x + ((area.size.width - ow) / 2) as i32,
+        area.position.y + ((area.size.height - oh) / 2) as i32,
+    ))?;
+    if width >= 3200.0 && height >= 1700.0 {
+        w.set_zoom(1.5)?;
+    }
+    Ok(())
+}
+
 fn show(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
@@ -369,6 +395,11 @@ fn main() {
                     }
                 })
                 .build(app)?;
+            if let Some(w) = app.get_webview_window("main")
+                && let Err(e) = fit_to_screen(&w)
+            {
+                eprintln!("ukuran jendela: {e}");
+            }
             if !std::env::args().any(|a| a == AUTOSTART_ARG) {
                 show(app.handle());
             }

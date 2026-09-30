@@ -1,7 +1,7 @@
 // Tab Rekap: satu baris per karyawan untuk satu bulan (atau rentang), klik untuk rincian per hari.
 // Hitungannya di hitung-rekap.js; tab ini hanya mengambil scan, menampilkan, dan meng-export.
 import {
-  $, byPin, data, dayName, deptOf, dmy, duration, esc, exportCsv, exportXlsx, hhmm, inRecap, knownPins, lastMonths,
+  $, byPin, data, dayName, deptOf, dmy, duration, esc, exportCsv, exportXlsx, firstScans, hhmm, inRecap, isRemoved, knownPins, lastMonths,
   logs, longDate, monthName, monthRange, nameOf, print, reportTitle, scheduleName, scheduleOf, today,
 } from './app.js';
 import { LEAVE_KINDS, addDays, correctionScans, recap } from './hitung-rekap.js';
@@ -89,8 +89,17 @@ export function recapAll(scans, pins, from, to, until = today()) {
     if (!groups.has(s)) groups.set(s, []);
     groups.get(s).push(pin);
   }
-  return [...groups].flatMap(([s, ps]) => recap({ scans, pins: ps, schedule: { ...data.schedule, days: s.days }, holidays: data.holidays,
-    leaves: data.leaves, from, to, today: until }));
+  // karyawan yang dihapus dari mesin: dihitung sampai tanggal hapus
+  const ends = Object.fromEntries(pins.filter(isRemoved).map((pin) => [pin, data.employees[pin].removed.slice(0, 10)]));
+  // karyawan baru: dihitung mulai hari pertama ada (scan pertama, ditambahkan lewat aplikasi, izin, atau koreksi);
+  // tanpa satu pun = belum mulai. Scan di rentang ini ikut dihitung, supaya scan pertama yang baru masuk tidak terlewat
+  const firstInRange = new Map();
+  for (const s of scans) if (!(firstInRange.get(s.pin) <= s.scan_date)) firstInRange.set(s.pin, s.scan_date.slice(0, 10));
+  const starts = !firstScans ? {} : Object.fromEntries(pins.map((pin) => [pin, [firstScans.get(pin), firstInRange.get(pin), data.employees[pin]?.added,
+    ...data.corrections.filter((c) => c.pin === pin).map((c) => c.date), ...data.leaves.filter((l) => l.pin === pin).map((l) => l.from)]
+    .filter(Boolean).sort()[0] ?? '9999-12-31']));
+  return [...groups].flatMap(([s, ps]) => recap({ scans, pins: ps, schedule: { ...data.schedule, days: s.days, overtime: s.overtime, overtimeMax: s.overtimeMax }, holidays: data.holidays,
+    leaves: data.leaves, from, to, today: until, starts, ends }));
 }
 
 /** Berapa kali, dengan total jam:menit di bawahnya. */
@@ -135,10 +144,11 @@ function render() {
   const counted = from > last ? (from === now ? pending : 'Periode ini belum dimulai.')
     : last < to ? `Dihitung sampai kemarin, <b>${longDate(last)}</b>. ${pending}` : '';
   const late = s.tolerance ? `Terlambat bila masuk lebih dari <b>${s.tolerance} menit</b> setelah jam masuk.` : 'Terlambat bila masuk setelah jam masuk.';
-  const overtime = s.overtimeOn === false ? 'Lembur <b>tidak dihitung</b>.' : `Lembur dihitung mulai <b>${s.overtimeMin} menit</b> setelah jam pulang.`;
+  const overtime = !anyOvertime() ? 'Lembur <b>tidak dihitung</b>.'
+    : `Lembur dihitung mulai <b>${s.overtimeMin} menit</b> setelah jam pulang, di hari yang lemburnya aktif.`;
   $('k-info').innerHTML = `${counted && `<p>${ICON_COUNTED}<span>${counted}</span></p>`}` +
     `<p>${ICON_RULES}<span>${late} ${overtime}</span><button data-ke="jam-kerja">Ubah aturan rekap</button></p>`;
-  $('rekap').classList.toggle('tanpa-lembur', s.overtimeOn === false);
+  $('rekap').classList.toggle('tanpa-lembur', !anyOvertime());
   const r = detail && result.find((x) => x.pin === detail);
   if (detail && !r) detail = null;
   $('k-ringkasan').hidden = !!r;
@@ -172,9 +182,12 @@ function render() {
     .join('');
 }
 
-/** Tanpa kolom Lembur bila lembur tidak dihitung. */
+/** Ada hari dengan lembur aktif di salah satu jadwal. */
+const anyOvertime = () => [data.schedule, ...data.schedules].some((s) => s.overtime.some(Boolean));
+
+/** Tanpa kolom Lembur bila lembur tidak dihitung di hari mana pun. */
 function withoutOvertime(t) {
-  if (data.schedule.overtimeOn !== false) return t;
+  if (anyOvertime()) return t;
   const keep = t.columns.map((c) => !c.title.startsWith('Lembur'));
   return { ...t, columns: t.columns.filter((_, i) => keep[i]), rows: t.rows.map((r) => r.filter((_, i) => keep[i])) };
 }

@@ -10,8 +10,10 @@
 export const DEFAULT_SCHEDULE = {
   days: [null, ...Array.from({ length: 5 }, () => ({ start: '08:00', end: '17:00' })), null],
   tolerance: 15, // menit terlambat yang masih tepat waktu
-  overtimeOn: true, // false = lembur tidak dihitung sama sekali
+  // lembur per hari (indeks sama dengan `days`): hari kerja = sesudah jam pulang, hari libur = seluruh jam kerja
+  overtime: Array(7).fill(true),
   overtimeMin: 60, // lembur di bawah ini dihitung 0
+  overtimeMax: Array(7).fill(0), // lembur paling lama (menit) per hari, indeks sama dengan `days`; 0 = tanpa batas
   minGap: 60, // jarak minimal masuk–pulang
 };
 
@@ -21,6 +23,66 @@ export const LEAVE_KINDS = ['izin', 'sakit', 'cuti', 'dinas'];
 export const correctionScans = (corrections, from, to) => corrections
   .filter((c) => from <= c.date && c.date <= to)
   .map((c) => ({ pin: c.pin, scan_date: `${c.date} ${c.time}:00`, manual: true, reason: c.reason }));
+
+/**
+ * Arti tiap scan menurut aturan rekap, bukan tombol Masuk/Pulang di mesin (mesin mengganti tombol sendiri
+ * menurut jam, mis. semua scan sebelum 09:00 tercatat "Pulang"): scan pertama per orang per hari = Masuk,
+ * scan terakhir = Pulang bila minimal `minGap` menit sesudahnya, sisanya tidak dihitung.
+ * Hasil: "PIN YYYY-MM-DD hh:mm:ss" -> 'Masuk' | 'Pulang'.
+ */
+export function scanRoles(scans, minGap) {
+  const perDay = new Map();
+  for (const s of scans) {
+    const k = `${s.pin} ${s.scan_date.slice(0, 10)}`;
+    perDay.set(k, [...(perDay.get(k) ?? []), s.scan_date]);
+  }
+  const roles = new Map();
+  for (const [k, list] of perDay) {
+    const pin = k.slice(0, k.indexOf(' '));
+    list.sort();
+    roles.set(`${pin} ${list[0]}`, 'Masuk');
+    if (minutes(list.at(-1), 11) - minutes(list[0], 11) >= minGap) roles.set(`${pin} ${list.at(-1)}`, 'Pulang');
+  }
+  return roles;
+}
+
+/**
+ * Data user yang disimpan server (`get_backup` -> `template`): body FkWeb
+ * u32 LE panjang JSON+NUL | JSON | [u32 LE panjang | biner]... (docs/protokol.md bagian 14).
+ * Hasil `{info, bins}` (JSON dan blok biner, dirujuk JSON sebagai "BIN_n"), atau null.
+ */
+export function fkBody(body) {
+  if (body.length < 4) return null;
+  const view = new DataView(body.buffer, body.byteOffset, body.byteLength);
+  const n = view.getUint32(0, true);
+  if (n > body.length - 4) return null;
+  let info;
+  try {
+    info = JSON.parse(new TextDecoder().decode(body.subarray(4, 4 + n)).replace(/\0$/, ''));
+  } catch {
+    return null;
+  }
+  const bins = [];
+  for (let p = 4 + n; p + 4 <= body.length; ) {
+    const len = view.getUint32(p, true);
+    bins.push(body.subarray(p + 4, Math.min(p + 4 + len, body.length)));
+    p += 4 + len;
+  }
+  return { info, bins };
+}
+
+/** Foto karyawan (JPEG) yang dikirim mesin bersama data user, bukan saat absen; null bila tidak ada. */
+export function userPhoto(body) {
+  const b = fkBody(body);
+  const n = Number(/^BIN_(\d+)$/.exec(b?.info.user_photo ?? '')?.[1]);
+  return (n && b.bins[n - 1]) || null;
+}
+
+/** Yang terdaftar di mesin untuk user ini: nomor jari (0-9, urut), password (10), kartu (11), dan wajah (12). */
+export function enrolled(body) {
+  const list = (fkBody(body)?.info.enroll_data_array ?? []).map((e) => e.backup_number);
+  return { fingers: list.filter((n) => n <= 9).sort((a, b) => a - b), password: list.includes(10), card: list.includes(11), face: list.includes(12) };
+}
 
 /** "hh:mm" (atau "YYYY-MM-DD hh:mm:ss" mulai indeks `at`) -> menit */
 export const minutes = (s, at = 0) => Number(s.slice(at, at + 2)) * 60 + Number(s.slice(at + 3, at + 5));
@@ -45,8 +107,10 @@ export const weekday = (date) => new Date(`${date}T00:00:00Z`).getUTCDay();
  * @param {string} o.from  YYYY-MM-DD, inklusif
  * @param {string} o.to  YYYY-MM-DD, inklusif
  * @param {string} o.today  YYYY-MM-DD; tanggal ini dan sesudahnya tidak dihitung
+ * @param {Record<string, string>} [o.starts]  PIN -> tanggal pertama (mulai ada); hari sebelumnya tidak dihitung
+ * @param {Record<string, string>} [o.ends]  PIN -> tanggal terakhir (dihapus dari mesin); hari sesudahnya tidak dihitung
  */
-export function recap({ scans, pins, schedule, holidays = [], leaves = [], from, to, today }) {
+export function recap({ scans, pins, schedule, holidays = [], leaves = [], from, to, today, starts = {}, ends = {} }) {
   const times = new Map(); // "pin tanggal" -> menit scan
   for (const s of scans) {
     const k = `${s.pin} ${s.scan_date.slice(0, 10)}`;
@@ -57,7 +121,7 @@ export function recap({ scans, pins, schedule, holidays = [], leaves = [], from,
   const dates = [];
   for (let d = from; d <= to && d < today; d = addDays(d, 1)) dates.push(d);
   return pins.map((pin) => {
-    const days = dates.map((date) => {
+    const days = dates.filter((date) => (!starts[pin] || date >= starts[pin]) && (!ends[pin] || date <= ends[pin])).map((date) => {
       const leave = leaves.find((l) => l.pin === pin && l.from <= date && date <= l.to)?.kind;
       return day(date, times.get(`${pin} ${date}`) ?? [], off.has(date) ? null : schedule.days[weekday(date)], schedule, leave, off.get(date));
     });
@@ -69,12 +133,13 @@ function day(date, scans, shift, s, leave, holiday) {
   const t = [...scans].sort((a, b) => a - b);
   const first = t[0];
   const out = t.length > 1 && t.at(-1) - first >= s.minGap ? t.at(-1) : null;
+  const ot = s.overtime?.[weekday(date)] !== false; // tanggal libur kantor ikut sakelar hari itu
   const d = { date, work: !!shift, in: first ?? null, out, status: 'hadir', late: 0, early: 0, noOut: false, hours: 0, overtime: 0, note: holiday ?? '' };
   if (first !== undefined && out !== null) d.hours = out - first;
   if (!shift) {
     // libur: tanpa scan = libur; masuk dan pulang = seluruh jam kerja jadi lembur hari libur
     d.status = 'libur';
-    d.overtime = s.overtimeOn === false ? 0 : d.hours;
+    d.overtime = ot ? d.hours : 0;
   } else if (leave) {
     d.status = leave; // bukan alpa walau ada scan
     d.hours = 0;
@@ -87,9 +152,11 @@ function day(date, scans, shift, s, leave, holiday) {
     if (out === null) d.noOut = true;
     else {
       if (out < end) d.early = end - out;
-      if (s.overtimeOn !== false && out - end >= s.overtimeMin) d.overtime = out - end;
+      if (ot && out - end >= s.overtimeMin) d.overtime = out - end;
     }
   }
+  const max = s.overtimeMax?.[weekday(date)];
+  if (max) d.overtime = Math.min(d.overtime, max);
   return d;
 }
 

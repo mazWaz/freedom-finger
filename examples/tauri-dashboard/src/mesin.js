@@ -4,7 +4,7 @@
 // disimpan di aplikasi.json, sehingga tetap terlihat setelah aplikasi dibuka ulang.
 import { invoke } from '@tauri-apps/api/core';
 import { ask } from '@tauri-apps/plugin-dialog';
-import { $, api, call, data, devices, dmy, esc, notify, port, saveData, users } from './app.js';
+import { $, api, call, data, devices, dmy, esc, notify, port, saveData, users, waiting } from './app.js';
 
 const ACTIONS = {
   set_time: { label: 'Setel jam sekarang', done: () => 'jam mesin sudah disetel' },
@@ -17,7 +17,7 @@ const MODE = { lokal: 'Mode Lokal', ditolak: 'Mode Lokal, password beda', diam: 
 const WAIT_MS = 10 * 60_000;
 
 /** Kode tolakan mesin -> kalimat biasa; kodenya tetap disebut untuk teknisi. */
-const REJECT = {
+export const REJECT = {
   ERROR_INVALID_PARAMTER: 'mesin menolak isi perintah',
   BUSY: 'mesin sedang dipakai (menu mesin terbuka); coba lagi setelah menu ditutup',
   'NOT SUPPORT CMD': 'mesin tidak mendukung perintah ini',
@@ -106,6 +106,8 @@ async function run(type, cloud_id) {
     const { trans_id } = await call(type, { cloud_id });
     data.commands.push({ trans: trans_id, cloud_id, type, at: Date.now() });
     await saveData(null);
+    awaited = trans_id;
+    waiting(`${ACTIONS[type].label}: menunggu mesin (±20 detik sampai 2 menit)…`);
   } catch (e) {
     return notify(`Gagal mengirim perintah: ${e.message}`, true);
   }
@@ -113,6 +115,7 @@ async function run(type, cloud_id) {
   resume();
 }
 
+let awaited = null; // perintah yang sedang ditunggu dengan layar tunggu (yang lain dipantau di kartu mesin)
 let timer;
 /** Pantau perintah yang sedang berjalan (juga setelah aplikasi dibuka ulang). */
 export function resume() {
@@ -159,6 +162,13 @@ async function tick() {
       await saveData(null);
       render();
     }
+    // layar tunggu ditutup saat perintahnya selesai, atau saat mesinnya terputus (perintah tetap dipantau di kartu)
+    const w = left.find((c) => c.trans === awaited);
+    if (awaited && (!w || devices.find((d) => d.cloud_id === w.cloud_id)?.connected === false)) {
+      if (w) notify('Mesin terputus. Perintahnya tetap menunggu dan dijalankan saat mesin tersambung lagi.', true);
+      awaited = null;
+      waiting();
+    }
     if (!left.length) clearInterval(timer);
   } finally {
     busy = false;
@@ -166,8 +176,7 @@ async function tick() {
 }
 
 async function search() {
-  $('m-cari').disabled = true;
-  $('m-hasil').innerHTML = '<p class="muted">Mencari mesin di jaringan (sampai 10 detik)…</p>';
+  waiting('Mencari mesin di jaringan (sampai 10 detik)…');
   try {
     const found = await api('scan_devices');
     $('m-hasil').innerHTML = found.length
@@ -178,6 +187,7 @@ async function search() {
   } catch (e) {
     $('m-hasil').innerHTML = '';
     notify(`Gagal mencari mesin: ${e.message}`, true);
+  } finally {
+    waiting();
   }
-  $('m-cari').disabled = false;
 }

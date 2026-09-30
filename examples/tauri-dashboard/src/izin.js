@@ -4,12 +4,14 @@
 // Form-nya ada di laci (panel samping) dan bisa dibuka dari tab lain lewat `openForm`, sudah terisi
 // nama dan tanggal (mis. dari kartu karyawan di Hari ini).
 import { ask } from '@tauri-apps/plugin-dialog';
-import { $, byPin, closeDrawer, data, dmy, esc, knownPins, nameOf, notify, openDrawer, period, saveData, today } from './app.js';
+import { $, byPin, closeDrawer, data, dmy, esc, knownPins, nameOf, notify, openDrawer, paginate, period, saveData, today } from './app.js';
 import { LEAVE_KINDS } from './hitung-rekap.js';
 import { LABEL } from './rekap.js';
 
 const FORMS = { leaves: 'i-izin', corrections: 'i-koreksi' }; // daftar di `data` -> form; tabelnya `<form>-daftar`
 const editing = {}; // daftar -> id catatan yang sedang diubah
+const PER_PAGE = 10;
+const page = { leaves: 1, corrections: 1 }; // halaman tabel yang terbuka, terbaru dulu
 const TITLE = { leaves: ['Catat izin', 'Ubah catatan izin'], corrections: ['Koreksi absen', 'Ubah koreksi absen'] };
 
 /** Isian form -> catatan, atau pesan kesalahan. */
@@ -87,13 +89,22 @@ export function show() {
   const buttons = (list, v) => ['ubah', 'hapus']
     .map((b) => `<button name="${b}"${b === 'hapus' ? ' class="bahaya"' : ''} data-id="${esc(v.id)}" aria-label="${b === 'ubah' ? 'Ubah' : 'Hapus'} ${esc(describe[list](v))}">${b === 'ubah' ? 'Ubah' : 'Hapus'}</button>`)
     .join(' ');
-  $('i-izin-daftar').innerHTML = [...data.leaves]
-    .sort((a, b) => b.from.localeCompare(a.from))
+  const [leaves, nl] = paginate($('i-izin-hal'), [...data.leaves].sort((a, b) => b.from.localeCompare(a.from)), page.leaves, PER_PAGE, (n) => {
+    page.leaves = n;
+    show();
+  });
+  page.leaves = nl;
+  $('i-izin-daftar').innerHTML = leaves
     .map((l) => `<tr><td>${period(l.from, l.to)}</td><td>${esc(nameOf(l.pin))}</td><td>${LABEL[l.kind]}</td><td>${esc(l.note)}</td>` +
       `<td class="num">${buttons('leaves', l)}</td></tr>`)
     .join('') || '<tr><td colspan="5" class="muted">Belum ada catatan. Tekan Catat izin, atau buka kartu karyawan di Hari ini.</td></tr>';
-  $('i-koreksi-daftar').innerHTML = [...data.corrections]
-    .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
+  const byTime = (a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`);
+  const [corrections, nc] = paginate($('i-koreksi-hal'), [...data.corrections].sort(byTime), page.corrections, PER_PAGE, (n) => {
+    page.corrections = n;
+    show();
+  });
+  page.corrections = nc;
+  $('i-koreksi-daftar').innerHTML = corrections
     .map((c) => `<tr><td>${dmy(c.date)}</td><td>${c.time}</td><td>${esc(nameOf(c.pin))}</td><td>${esc(c.reason)}</td>` +
       `<td class="num">${buttons('corrections', c)}</td></tr>`)
     .join('') || '<tr><td colspan="5" class="muted">Belum ada koreksi.</td></tr>';

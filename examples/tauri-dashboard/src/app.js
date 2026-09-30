@@ -100,8 +100,8 @@ export function notify(text, error = false) {
 }
 
 /**
- * Laci (panel samping, `<dialog>` modal: fokus terkunci di dalam, Esc menutup): tampilkan satu isi
- * (`laci-orang`, `i-izin`, `i-koreksi`) dengan judul. Dipakai tab Hari ini dan Izin & koreksi.
+ * Laci (modal di tengah layar, `<dialog>`: fokus terkunci di dalam, Esc menutup): tampilkan satu isi
+ * (`laci-orang`, `i-izin`, `y-laci-daftar`, …) dengan judul. Dipakai semua tab.
  */
 export function openDrawer(pane, title, sub = '') {
   const d = $('laci');
@@ -112,6 +112,45 @@ export function openDrawer(pane, title, sub = '') {
   if (!d.open) d.showModal();
 }
 export const closeDrawer = () => $('laci').close();
+
+/** Gambar mesin absensi bergaya Lucide (badan, layar, sensor jari); Lucide tidak punya ikon ini. */
+export const MACHINE_ICON = [
+  ['rect', { x: '5', y: '2', width: '14', height: '20', rx: '2' }],
+  ['rect', { x: '8', y: '5', width: '8', height: '6', rx: '1' }],
+  ['path', { d: 'M10 18.5v-2a2 2 0 0 1 4 0v2' }],
+];
+
+let waitStart = 0;
+let waitTimer;
+// Esc selama menunggu: diabaikan. Membatalkan `cancel` saja tidak cukup: Chromium menutup paksa pada Esc
+// kedua, dan ikut menutup laci di bawahnya
+addEventListener('keydown', (e) => {
+  if (waitStart && e.key === 'Escape') e.preventDefault();
+}, true);
+/**
+ * Layar tunggu selama menunggu mesin: spinner, pesan langkahnya, dan lama menunggu. Seluruh halaman
+ * terkunci (`<dialog>` modal paling atas, juga di atas laci), dan Esc tidak menutupnya. Tanpa `text`: tutup.
+ */
+export function waiting(text) {
+  const d = $('tunggu');
+  if (!text) {
+    waitStart = 0;
+    clearInterval(waitTimer);
+    return d.close();
+  }
+  $('tunggu-teks').textContent = text;
+  if (waitStart) return;
+  if (!d.querySelector('svg')) d.querySelector('.putar').append(createElement(MACHINE_ICON));
+  d.oncancel = (e) => e.preventDefault();
+  waitStart = Date.now();
+  const tick = () => {
+    const s = Math.floor((Date.now() - waitStart) / 1000);
+    $('tunggu-lama').textContent = `Sudah menunggu ${Math.floor(s / 60)}:${pad(s % 60)}`;
+  };
+  tick();
+  waitTimer = setInterval(tick, 1000);
+  d.showModal();
+}
 
 /** Perubahan yang perlu ditampilkan ulang tab yang terbuka: logs, users, devices, data. */
 export const bus = new EventTarget();
@@ -138,6 +177,34 @@ export async function call(endpoint, body = {}) {
   return j;
 }
 export const api = async (endpoint, body) => (await call(endpoint, body)).data;
+
+/**
+ * Cadangan data satu user di server (`get_backup`, dari data yang dikirim mesin), satu per mesin yang
+ * punya, terbaru dulu: `{cloud_id, name, privilege, updated, template, body}` dengan `template` = base64
+ * untuk set_userinfo dan `body` = byte body FkWeb yang sama (lihat fkBody).
+ */
+export async function backups(pin) {
+  const list = await Promise.all(devices.map((d) => api('get_backup', { cloud_id: d.cloud_id, pin })
+    .then((b) => ({ ...b, cloud_id: d.cloud_id, body: Uint8Array.from(atob(b.template), (c) => c.charCodeAt(0)) }), () => null)));
+  return list.filter(Boolean).sort((a, b) => b.updated.localeCompare(a.updated));
+}
+
+/**
+ * Kirim perintah ke mesin dan tunggu hasilnya (mesin mengambil perintah saat bertanya, ±20 detik–2 menit).
+ * `status` "offline": mesin terputus sebelum mengambil perintahnya; perintah tetap mengantre di server.
+ */
+export async function command(cloud_id, endpoint, body = {}) {
+  const { trans_id } = await call(endpoint, { cloud_id, ...body });
+  const start = Date.now();
+  for (;;) {
+    await new Promise((ok) => setTimeout(ok, 3000));
+    const r = await call('get_result', { cloud_id, trans_id });
+    if (r.status === 'done' || r.status === 'timeout') return r;
+    // daftar mesin diperbarui tiap menit (main.js); terputus = tidak bertanya lebih dari 3 menit
+    if (r.status === 'pending' && devices.find((d) => d.cloud_id === cloud_id)?.connected === false) return { ...r, status: 'offline' };
+    if (r.status === 'pending' && Date.now() - start > 10 * 60_000) return { ...r, status: 'timeout' }; // mesin mati atau dicabut
+  }
+}
 
 /**
  * Event realtime (SSE lewat fetch, karena EventSource tidak bisa mengirim token): absen baru dan
@@ -169,6 +236,22 @@ export async function loadDevices() {
   emit('devices');
 }
 
+/**
+ * Tanggal scan pertama tiap PIN sepanjang data (semua mesin): rekap menghitung karyawan mulai hari itu.
+ * `null` sampai dimuat; bila gagal dimuat, rekap menghitung seperti biasa (tanpa tanggal mulai).
+ */
+export let firstScans = null;
+export async function loadFirstScans() {
+  const first = new Map();
+  for (const l of await logs('2000-01-01', today())) {
+    const d = l.scan_date.slice(0, 10);
+    if (!(first.get(l.pin) <= d)) first.set(l.pin, d);
+  }
+  firstScans = first;
+}
+/** Absen baru dari event realtime: orang yang baru pertama kali scan. */
+export const noteScan = (pin, date) => firstScans && !firstScans.has(pin) && firstScans.set(pin, date);
+
 /** Log absen semua mesin (atau satu), masing-masing dengan `cloud_id`. */
 export async function logs(from, to, cloudId) {
   const ids = cloudId ? [cloudId] : devices.map((d) => d.cloud_id);
@@ -184,8 +267,8 @@ const defaults = () => ({
   version: 1,
   office: '', // nama kantor untuk judul laporan
   employees: {}, // PIN -> {name, dept, recap}: isian aplikasi menang atas nama di mesin
-  schedule: structuredClone(DEFAULT_SCHEDULE), // jadwal utama, dan aturan (toleransi, lembur) untuk semua jadwal
-  schedules: [], // jadwal lain {id, name, days}, dipilih per karyawan (mis. paruh waktu)
+  schedule: structuredClone(DEFAULT_SCHEDULE), // jadwal utama, dan aturan (toleransi, batas lembur) untuk semua jadwal
+  schedules: [], // jadwal lain {id, name, color, days, overtime, overtimeMax}, dipilih per karyawan (mis. paruh waktu)
   holidays: [], // {date, note}
   leaves: [], // {id, pin, from, to, kind, note}: izin/sakit/cuti/dinas (izin.js)
   corrections: [], // {id, pin, date, time, reason}: koreksi absen, dihitung sebagai scan; tidak pernah ditulis ke mesin
@@ -200,6 +283,13 @@ export async function loadData() {
   const saved = (await invoke('load_data')) ?? {};
   const d = defaults();
   Object.assign(data, d, saved, { schedule: { ...d.schedule, ...saved.schedule }, backup: { ...d.backup, ...saved.backup } });
+  // dulu lembur satu sakelar untuk semua jadwal (`overtimeOn`); sekarang per hari di tiap jadwal
+  const on = saved.schedule?.overtimeOn !== false;
+  if (!saved.schedule?.overtime) data.schedule.overtime = Array(7).fill(on);
+  for (const s of data.schedules) s.overtime ??= Array(7).fill(on);
+  // lembur maksimal per hari (menit); sempat satu angka per jadwal
+  for (const s of [data.schedule, ...data.schedules]) if (!Array.isArray(s.overtimeMax)) s.overtimeMax = Array(7).fill(s.overtimeMax || 0);
+  data.schedules.forEach((s, i) => (s.color ??= SCHEDULE_COLORS[i % SCHEDULE_COLORS.length]));
 }
 
 /** Simpan aplikasi.json (atomik di sisi Rust), lalu beri tahu tab yang terbuka. */
@@ -237,8 +327,25 @@ export const inRecap = (pin) => data.employees[pin]?.recap !== false;
 /** Jadwal lain yang dipilih untuk karyawan ini; `undefined` = jadwal utama. */
 export const scheduleOf = (pin) => data.schedules.find((s) => s.id === data.employees[pin]?.schedule);
 export const scheduleName = (pin) => scheduleOf(pin)?.name ?? 'Utama';
-/** Semua PIN yang dikenal: dari mesin dan dari isian aplikasi. */
-export const knownPins = () => [...new Set([...users.map((u) => u.pin), ...Object.keys(data.employees)])].sort(byPin);
+/** Warna bawaan jadwal lain, jauh dari warna status (hijau tepat waktu, merah terlambat, biru izin). */
+export const SCHEDULE_COLORS = ['#7c3aed', '#d97706', '#db2777', '#0d9488', '#4f46e5', '#92400e'];
+/** Warna satu jadwal ("#rrggbb"); jadwal utama bawaan abu-abu biru. Dicek karena masuk ke atribut style. */
+export const colorOf = (s) => (/^#[0-9a-f]{6}$/i.test(s?.color ?? '') ? s.color : '#64748b');
+/** Tanda jadwal karyawan (titik warna dan nama) untuk Hari ini; kosong bila hanya ada jadwal utama. */
+export const scheduleTag = (pin) => (data.schedules.length
+  ? `<span class="jadwal-tag" style="--warna: ${colorOf(scheduleOf(pin) ?? data.schedule)}">${esc(scheduleName(pin))}</span>` : '');
+/**
+ * Dihapus dari mesin lewat aplikasi (`employees[pin].removed` = "YYYY-MM-DD hh:mm:ss") dan belum terdaftar
+ * lagi sesudahnya. Riwayat absennya tetap ada; hari sesudah tanggal hapus tidak dihitung di rekap.
+ */
+export const isRemoved = (pin) => {
+  const at = data.employees[pin]?.removed;
+  return !!at && !users.some((u) => u.pin === pin && u.updated > at);
+};
+/** PIN yang pernah dipakai (termasuk yang dihapus): dipakai lagi berarti riwayat absennya tercampur. */
+export const usedPins = () => [...new Set([...users.map((u) => u.pin), ...Object.keys(data.employees)])].sort(byPin);
+/** Semua karyawan: dari mesin dan dari isian aplikasi, kecuali yang dihapus dari mesin. */
+export const knownPins = () => usedPins().filter((pin) => !isRemoved(pin));
 
 // --- export dan cetak -------------------------------------------------------------------------
 
