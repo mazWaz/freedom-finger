@@ -1020,6 +1020,7 @@ Implementasi referensi: modul `freedom_finger_sdk::fkweb` (codec dan pesan) dan 
 | Keamanan | Tanpa TLS dan tanpa autentikasi. Mesin dikenali dari header `dev_id` (= Cloud ID mesin). |
 | Server resmi | `fdevice.com:8013` / `8014` (fingerspot.io), `fdevice.com:9004` (developer.fingerspot.io) |
 | Kompresi | Mesin mengirim `Accept-Encoding: gzip, deflate`. Server cukup menjawab tanpa kompresi. |
+| Huruf nama header | Mesin membaca `Content-Length` peka huruf besar-kecil: balasan harus menulis `Content-Length` (juga `Content-Type`, `Date`) persis begitu. Dengan `content-length` huruf kecil, isi perintah dianggap kosong dan perintah berparameter dijawab `ERROR_INVALID_PARAMTER`. Sebaliknya `response_code`, `trans_id`, `cmd_code` harus huruf kecil; bila ditulis `Response_code`, mesin tidak menjawab sama sekali. Diuji di mesin asli 30-09-2026. |
 
 ### 14.2 Header
 

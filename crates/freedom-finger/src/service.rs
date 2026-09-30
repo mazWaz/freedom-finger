@@ -189,9 +189,12 @@ impl Service {
                 let note = match (f.mode, &id) {
                     (_, Some(_)) => "terhubung ke server ini".to_owned(),
                     (Mode::Diam, None) => {
-                        format!("kemungkinan mesin di mode Internet yang belum mengirim ke server ini; atur menu Jaringan: {setting}")
+                        format!(
+                            "kemungkinan mesin di mode Internet yang mengirim ke server lain, atau menunya belum diatur. \
+                             Untuk memakai server ini, atur menu Jaringan: {setting}. Setelah itu absen tidak lagi masuk ke server lain."
+                        )
                     }
-                    (Mode::Lokal, None) => format!("mesin di mode Lokal; untuk server ini atur menu Jaringan: {setting}"),
+                    (Mode::Lokal, None) => format!("mesin di mode Lokal. Untuk memakai server ini, atur menu Jaringan: {setting}."),
                     (Mode::Ditolak, None) => "mesin di mode Lokal, password komunikasi berbeda (FK_PASSWORD)".to_owned(),
                 };
                 json!({ "ip": f.ip, "mode": f.mode, "cloud_id": id, "note": note })

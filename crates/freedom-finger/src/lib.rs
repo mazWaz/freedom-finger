@@ -14,11 +14,11 @@
 //! ```
 
 use std::future::{Future, IntoFuture};
-use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
 pub mod config;
+pub mod device_io;
 pub mod http;
 pub mod net;
 pub mod service;
@@ -30,8 +30,9 @@ use config::{Config, ENV_FILE};
 pub async fn serve(cfg: Config, shutdown: impl Future<Output = ()> + Send + 'static) -> std::io::Result<()> {
     let store = store::Store::open(&cfg.db).map_err(|e| std::io::Error::other(format!("{}: {e}", cfg.db.display())))?;
     let svc = service::Service::new(store, &cfg);
-    let listener = tokio::net::TcpListener::bind(("0.0.0.0", cfg.port)).await?;
-    let app = http::router(svc, cfg.token).into_make_service_with_connect_info::<SocketAddr>();
+    // balasan ke mesin perlu `Content-Length` berhuruf besar (lihat device_io)
+    let listener = device_io::DeviceListener(tokio::net::TcpListener::bind(("0.0.0.0", cfg.port)).await?);
+    let app = http::router(svc, cfg.token).into_make_service_with_connect_info::<device_io::Remote>();
     let stop = Arc::new(tokio::sync::Notify::new());
     let s = stop.clone();
     let server = axum::serve(listener, app).with_graceful_shutdown(async move {

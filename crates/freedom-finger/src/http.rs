@@ -11,7 +11,6 @@
 //! | `POST` path lain | mesin (FkWeb, `POST /`) |
 
 use std::convert::Infallible;
-use std::net::SocketAddr;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
@@ -54,7 +53,7 @@ pub fn router(svc: Service, token: String) -> Router {
 
 async fn handle(State(app): State<Arc<App>>, method: Method, uri: Uri, ext: Extensions, headers: HeaderMap, body: Bytes) -> Response {
     // tanpa ConnectInfo (uji lewat router langsung) alamat pengirim tidak diketahui
-    let remote = ext.get::<ConnectInfo<SocketAddr>>().map(|c| c.0.ip());
+    let remote = ext.get::<ConnectInfo<crate::device_io::Remote>>().map(|c| c.0.0.ip());
     match (method, uri.path()) {
         (Method::GET, "/") => respond(app.svc().status(), |s| Html(page(&s)).into_response()),
         (Method::GET, "/status.json") => respond(app.svc().status(), |s| axum::Json(s).into_response()),
