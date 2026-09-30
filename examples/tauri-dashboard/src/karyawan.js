@@ -2,10 +2,11 @@
 // mesin. Mesin hanya menjawab satu perintah setiap ±20 detik, jadi pengambilan berjalan lama; antrean
 // perintahnya ada di server dan kemajuannya di aplikasi.json, sehingga tetap berlanjut walau
 // aplikasi ditutup atau PC dimatikan.
-import { $, byPin, call, data, devices, esc, knownPins, loadUsers, machineName, notify, saveData, users } from './app.js';
+import { $, byPin, call, data, devices, esc, knownPins, loadUsers, machineName, nameOf, notify, saveData, users } from './app.js';
 
 export function init() {
   $('y-ambil').onclick = startPull;
+  $('y-cari').oninput = filter;
   let saveTimer;
   // simpan saat mengetik (tertunda sebentar); tabel bisa digambar ulang saat data mesin masuk
   $('y-daftar').oninput = (e) => {
@@ -27,14 +28,15 @@ export function show() {
   const pins = knownPins();
   const status = pullStatus();
   $('y-status').textContent = status;
+  $('y-status').hidden = !status;
   $('y-ambil').disabled = !!status;
   $('y-info').textContent = `${pins.length} karyawan`;
   // baris yang sama: cukup perbarui nama di mesin, supaya isian yang sedang diketik tidak hilang
   const tbody = $('y-daftar');
   const key = `${pins.join(',')}|${data.schedules.map((s) => `${s.id}=${s.name}`).join(',')}`;
   if (tbody.dataset.key === key) {
-    for (const tr of tbody.rows) if (tr.dataset.pin) tr.cells[1].textContent = machineName(tr.dataset.pin);
-    return;
+    for (const tr of tbody.rows) if (tr.dataset.pin) tr.querySelector('.di-mesin').textContent = diMesin(tr.dataset.pin, data.employees[tr.dataset.pin]?.name);
+    return filter();
   }
   tbody.dataset.key = key;
   const options = (pin) => [{ id: '', name: 'Utama' }, ...data.schedules]
@@ -43,13 +45,28 @@ export function show() {
     .map((pin) => {
       const e = data.employees[pin] ?? {};
       const label = `PIN ${esc(pin)}`;
-      return `<tr data-pin="${esc(pin)}"><td>${esc(pin)}</td><td>${esc(machineName(pin))}</td>` +
-        `<td><input name="name" value="${esc(e.name ?? '')}" placeholder="${esc(machineName(pin) || 'Nama lengkap')}" aria-label="Nama lengkap ${label}"></td>` +
-        `<td><input name="dept" value="${esc(e.dept ?? '')}" aria-label="Departemen ${label}"></td>` +
-        `<td><select name="schedule" aria-label="Jadwal ${label}">${options(pin)}</select></td>` +
-        `<td><input type="checkbox" name="recap"${e.recap === false ? '' : ' checked'} aria-label="Ikut rekap ${label}"></td></tr>`;
+      // kotak isian "senyap": tanpa garis sampai baris disentuh, supaya tabel terbaca sebagai daftar
+      return `<tr data-pin="${esc(pin)}"><td class="pin">${esc(pin)}</td>` +
+        `<td><input class="senyap" name="name" value="${esc(e.name ?? '')}" placeholder="${esc(machineName(pin) || 'Nama lengkap')}" aria-label="Nama lengkap ${label}">` +
+        `<small class="di-mesin">${esc(diMesin(pin, e.name))}</small></td>` +
+        `<td><input name="dept" value="${esc(e.dept ?? '')}" placeholder="Isi departemen" class="senyap petunjuk" aria-label="Departemen ${label}"></td>` +
+        `<td><select class="senyap" name="schedule" aria-label="Jadwal ${label}">${options(pin)}</select></td>` +
+        `<td class="tengah"><input type="checkbox" class="saklar" name="recap"${e.recap === false ? '' : ' checked'} aria-label="Ikut rekap ${label}"></td></tr>`;
     })
-    .join('') || '<tr><td colspan="6" class="muted">Belum ada data karyawan. Tekan tombol Ambil data karyawan dari mesin.</td></tr>';
+    .join('') || '<tr><td colspan="5" class="muted">Belum ada data karyawan. Tekan Ambil data dari mesin.</td></tr>';
+  filter();
+}
+
+/** Keterangan di bawah nama: nama di mesin bila berbeda dari nama lengkap, atau asal nama yang tampil. */
+const diMesin = (pin, full) => (!machineName(pin) ? 'Belum ada nama di mesin' : full ? `Di mesin: ${machineName(pin)}` : 'Nama dari mesin');
+
+/** Cari nama (di mesin atau lengkap) atau PIN: sembunyikan baris lain, tanpa menggambar ulang tabel. */
+function filter() {
+  const q = $('y-cari').value.trim().toLowerCase();
+  for (const tr of $('y-daftar').rows) {
+    const pin = tr.dataset.pin;
+    if (pin) tr.hidden = !!q && !pin.includes(q) && !`${nameOf(pin)} ${machineName(pin)}`.toLowerCase().includes(q);
+  }
 }
 
 function pullStatus() {

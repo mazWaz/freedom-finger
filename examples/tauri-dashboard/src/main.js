@@ -5,7 +5,12 @@
 // selama PC mati, karena antrean kiriman mesin sendiri masuk pelan.
 // Tampilan terkunci sampai kata sandi benar (kunci.js); tugas latar tetap berjalan.
 import '@fontsource-variable/plus-jakarta-sans';
-import { $, api, bus, connect, data, devices, emit, listen, loadData, loadDevices, loadUsers } from './app.js';
+import {
+  CalendarCheck, CalendarX, Clock, DatabaseBackup, Download, FilePenLine, FileSpreadsheet, FileText, FingerprintPattern, History, Lock, PenLine, Plus,
+  Printer, Settings, Sheet, UserPlus, Users,
+  createIcons,
+} from 'lucide';
+import { $, api, bus, closeDrawer, connect, data, devices, emit, listen, loadData, loadDevices, loadUsers } from './app.js';
 import * as hariIni from './hari-ini.js';
 import * as izin from './izin.js';
 import * as karyawan from './karyawan.js';
@@ -14,8 +19,19 @@ import * as mesin from './mesin.js';
 import * as pengaturan from './pengaturan.js';
 import * as rekap from './rekap.js';
 import * as riwayat from './riwayat.js';
+import * as tanggal from './tanggal.js';
 
-const TABS = { 'hari-ini': hariIni, riwayat, rekap, izin, karyawan, mesin, pengaturan };
+// Jam kerja, Hari libur, dan Backup ditangani pengaturan.js bersama Pengaturan (satu modul, empat menu)
+const TABS = { 'hari-ini': hariIni, riwayat, rekap, izin, karyawan, 'jam-kerja': pengaturan, libur: pengaturan, mesin, backup: pengaturan, pengaturan };
+
+// ikon menu (Lucide, ISC): <i data-lucide="…"> diganti SVG
+createIcons({
+  icons: {
+    CalendarCheck, CalendarX, Clock, DatabaseBackup, Download, FilePenLine, FileSpreadsheet, FileText, FingerprintPattern, History, Lock, PenLine, Plus,
+    Printer, Settings, Sheet, UserPlus, Users,
+  },
+});
+tanggal.init(); // semua <input type="date">: tampil "1 Januari 2026", kalender berbahasa Indonesia
 let active = 'hari-ini';
 
 function open(name) {
@@ -52,8 +68,14 @@ async function main() {
     }
   }
   await loadUsers();
-  for (const t of Object.values(TABS)) t.init?.();
+  for (const t of new Set(Object.values(TABS))) t.init?.();
   for (const n of Object.keys(TABS)) $(`tab-${n}`).onclick = () => open(n);
+  $('laci-tutup').onclick = closeDrawer;
+  // klik di luar panel. Jangan `=> cond && close()`: onclick yang mengembalikan false membatalkan
+  // aksi bawaan, sehingga tombol Simpan di dalam panel tidak men-submit form
+  $('laci').onclick = (e) => {
+    if (e.target === $('laci')) closeDrawer();
+  };
   // perubahan data -> tab yang terbuka digambar ulang (tiap tab memilih apa yang perlu diambil lagi)
   for (const type of ['logs', 'users', 'devices', 'data', 'employees']) {
     bus.addEventListener(type, () => TABS[active].show(type));

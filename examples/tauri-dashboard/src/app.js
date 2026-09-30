@@ -2,7 +2,8 @@
 // aplikasi (aplikasi.json lewat perintah Rust), nama karyawan, tanggal, dan export.
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
-import { DEFAULT_SCHEDULE, addDays, weekday } from './hitung-rekap.js';
+import { ChevronLeft, ChevronRight, createElement } from 'lucide';
+import { DEFAULT_SCHEDULE, addDays, addMonths, weekday } from './hitung-rekap.js';
 
 export const $ = (id) => document.getElementById(id);
 // PIN dan nama datang dari mesin (atau siapa pun di LAN yang meniru mesin): jangan masuk HTML mentah
@@ -23,6 +24,8 @@ export const dmy = (date) => date.split('-').reverse().join('-');
 export const period = (from, to) => (from === to ? dmy(from) : `${dmy(from)} s.d. ${dmy(to)}`);
 const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 export const monthName = (ym) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
+/** 2026-01-01 -> "1 Januari 2026" */
+export const longDate = (date) => `${Number(date.slice(8))} ${monthName(date)}`;
 /** "2026-09" -> ["2026-09-01", "2026-09-30"] */
 export const monthRange = (ym) => [`${ym}-01`, new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).toISOString().slice(0, 10)];
 /** `n` bulan terakhir, terbaru dulu: ["2026-09", "2026-08", …] */
@@ -30,18 +33,55 @@ export function lastMonths(n) {
   const [y, m] = today().split('-').map(Number);
   return Array.from({ length: n }, (_, i) => new Date(Date.UTC(y, m - 1 - i, 1)).toISOString().slice(0, 7));
 }
-/** Rentang cepat di Riwayat -> [dari, sampai] */
-export function range(kind) {
+/** Rentang cepat di pemilih rentang tanggal (tanggal.js): label -> [dari, sampai] */
+export function ranges() {
   const t = today();
   const first = `${t.slice(0, 8)}01`;
   const last = addDays(first, -1);
+  const back = (n) => [addDays(addMonths(t, -n), 1), t]; // n bulan terakhir, sampai hari ini
   return {
-    today: [t, t],
-    yesterday: [addDays(t, -1), addDays(t, -1)],
-    week: [addDays(t, -((weekday(t) + 6) % 7)), t], // minggu mulai Senin
-    month: [first, t],
-    lastMonth: [`${last.slice(0, 8)}01`, last],
-  }[kind];
+    'Hari ini': [t, t],
+    Kemarin: [addDays(t, -1), addDays(t, -1)],
+    'Minggu ini': [addDays(t, -((weekday(t) + 6) % 7)), t], // minggu mulai Senin
+    '1 minggu terakhir': [addDays(t, -6), t],
+    'Bulan ini': [first, t],
+    'Bulan lalu': [`${last.slice(0, 8)}01`, last],
+    '1 bulan terakhir': back(1),
+    '2 bulan terakhir': back(2),
+    '3 bulan terakhir': back(3),
+    '6 bulan terakhir': back(6),
+    '1 tahun terakhir': back(12),
+  };
+}
+
+// --- halaman ----------------------------------------------------------------------------------
+
+const PREV = createElement(ChevronLeft).outerHTML;
+const NEXT = createElement(ChevronRight).outerHTML;
+
+/**
+ * Satu halaman dari `list` (`page` mulai 1, dijaga di dalam batas) dan tombol halamannya di `nav`:
+ * "1–24 dari 57  ‹ 1 … 4 5 6 … 9 ›". Klik tombol memanggil `go(halaman)`; satu halaman saja = `nav`
+ * disembunyikan. Hasil: [isi halaman, halaman yang dipakai].
+ */
+export function paginate(nav, list, page, size, go) {
+  const last = Math.max(1, Math.ceil(list.length / size));
+  page = Math.min(Math.max(page, 1), last);
+  const near = [...new Set([1, page - 1, page, page + 1, last])].filter((n) => n >= 1 && n <= last).sort((a, b) => a - b);
+  const btn = (n, text, label) => `<button type="button" data-hal="${n}" aria-label="${label ?? `Halaman ${n}`}"` +
+    `${!label && n === page ? ' aria-current="page"' : ''}${n < 1 || n > last ? ' disabled' : ''}>${text}</button>`;
+  nav.hidden = last < 2;
+  nav.innerHTML = `<span>${(page - 1) * size + 1}–${Math.min(page * size, list.length)} dari ${list.length}</span>` +
+    btn(page - 1, PREV, 'Halaman sebelumnya') +
+    near.map((n, i) => `${n - (near[i - 1] ?? n) > 1 ? '<span aria-hidden="true">…</span>' : ''}${btn(n, n)}`).join('') +
+    btn(page + 1, NEXT, 'Halaman berikutnya');
+  nav.onclick = (e) => {
+    const b = e.target.closest('button[data-hal]');
+    if (!b) return;
+    go(Number(b.dataset.hal));
+    nav.querySelector('[aria-current="page"]')?.focus(); // tombolnya baru digambar ulang: fokus jangan hilang
+  };
+  return [list.slice((page - 1) * size, page * size), page];
 }
 
 // --- pesan untuk pengguna ---------------------------------------------------------------------
@@ -52,9 +92,26 @@ export function notify(text, error = false) {
   p.textContent = text;
   p.className = error ? 'off' : 'ok';
   p.hidden = false;
+  p.title = 'Klik untuk menutup';
+  p.onclick = () => (p.hidden = true);
   clearTimeout(hideTimer);
-  if (!error) hideTimer = setTimeout(() => (p.hidden = true), 8000);
+  // pesan gagal tampil lebih lama agar sempat dibaca, tapi tetap hilang sendiri
+  hideTimer = setTimeout(() => (p.hidden = true), error ? 20_000 : 8000);
 }
+
+/**
+ * Laci (panel samping, `<dialog>` modal: fokus terkunci di dalam, Esc menutup): tampilkan satu isi
+ * (`laci-orang`, `i-izin`, `i-koreksi`) dengan judul. Dipakai tab Hari ini dan Izin & koreksi.
+ */
+export function openDrawer(pane, title, sub = '') {
+  const d = $('laci');
+  for (const el of d.querySelectorAll('.laci-isi')) el.hidden = el.id !== pane;
+  $('laci-judul').textContent = title;
+  $('laci-sub').textContent = sub;
+  $('laci-sub').hidden = !sub;
+  if (!d.open) d.showModal();
+}
+export const closeDrawer = () => $('laci').close();
 
 /** Perubahan yang perlu ditampilkan ulang tab yang terbuka: logs, users, devices, data. */
 export const bus = new EventTarget();

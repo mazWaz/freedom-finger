@@ -1,8 +1,9 @@
-// Tab Pengaturan: nama kantor, jam kerja, hari libur, dan backup. Semua tersimpan di aplikasi.json
-// dan langsung dipakai rekap.
+// Menu Jam kerja, Hari libur, Backup, dan Pengaturan (nama kantor, kata sandi): satu modul untuk
+// empat menu, semuanya digambar saat salah satunya dibuka. Tersimpan di aplikasi.json dan langsung
+// dipakai rekap.
 import { invoke } from '@tauri-apps/api/core';
 import { ask, open } from '@tauri-apps/plugin-dialog';
-import { $, DAY_NAMES, data, dmy, esc, notify, saveData, today } from './app.js';
+import { $, DAY_NAMES, closeDrawer, data, dayName, dmy, esc, monthName, notify, openDrawer, port, saveData, today } from './app.js';
 import { DEFAULT_SCHEDULE, addDays } from './hitung-rekap.js';
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Senin dulu
@@ -11,6 +12,13 @@ const NUMBERS = { tolerance: 'p-toleransi', overtimeMin: 'p-lembur', minGap: 'p-
 const BACKUP_WARN_DAYS = 7;
 
 export function init() {
+  // ganti kata sandi di laci; pemeriksaan dan penyimpanannya di kunci.js
+  $('p-sandi-buka').onclick = () => {
+    $('p-sandi').reset();
+    openDrawer('p-sandi', 'Ganti kata sandi');
+    $('p-sandi').elements.lama.focus();
+  };
+  $('p-sandi').elements.batal.onclick = closeDrawer;
   $('p-kantor').onchange = () => {
     data.office = $('p-kantor').value.trim();
     saveData();
@@ -21,12 +29,12 @@ export function init() {
       s.name = e.target.value.trim() || 'Tanpa nama';
       return saveData();
     }
-    const tr = e.target.closest('tr[data-day]');
+    const tr = e.target.closest('[data-day]');
     const q = (k) => tr.querySelector(`[name=${k}]`);
     // hari yang baru dijadikan hari kerja memakai jam hari kerja lain
     const base = s.days.find(Boolean) ?? { start: '08:00', end: '17:00' };
     const [start, end] = [q('start').value || base.start, q('end').value || base.end];
-    if (q('work').checked && start >= end) return notify(`${tr.cells[0].textContent}: jam pulang harus setelah jam masuk.`, true);
+    if (q('work').checked && start >= end) return notify(`${DAY_NAMES[tr.dataset.day]}: jam pulang harus setelah jam masuk.`, true);
     s.days[tr.dataset.day] = q('work').checked ? { start, end } : null;
     saveData();
     show();
@@ -98,27 +106,36 @@ export function init() {
 export function show(reason = 'open') {
   if (reason !== 'open') return;
   $('p-kantor').value = data.office;
-  const table = (days, label) => '<table style="width: auto"><thead><tr><th>Hari</th><th>Kerja</th><th>Masuk</th><th>Pulang</th></tr></thead><tbody>' +
-    ORDER.map((i) => {
-      const d = days[i];
-      const dis = d ? '' : ' disabled';
-      const l = `${label} ${DAY_NAMES[i]}`;
-      return `<tr data-day="${i}"><td>${DAY_NAMES[i]}</td>` +
-        `<td><input type="checkbox" name="work"${d ? ' checked' : ''} aria-label="${esc(l)} hari kerja"></td>` +
-        `<td><input type="time" name="start" value="${d?.start ?? ''}"${dis} aria-label="${esc(l)} jam masuk"></td>` +
-        `<td><input type="time" name="end" value="${d?.end ?? ''}"${dis} aria-label="${esc(l)} jam pulang"></td></tr>`;
-    }).join('') + '</tbody></table>';
-  const others = data.schedules.map((s) => `<div data-sched="${esc(s.id)}"><h3><label>Jadwal <input name="sname" value="${esc(s.name)}"></label> ` +
-    `<button data-hapus="${esc(s.id)}" class="bahaya">Hapus jadwal</button></h3>${table(s.days, s.name)}</div>`);
-  $('p-jadwal').innerHTML = `<div data-sched=""><h3>Utama${others.length ? ' <span class="muted">(karyawan yang tidak dipilih jadwal lain)</span>' : ''}</h3>` +
-    `${table(data.schedule.days, 'Utama')}</div>${others.join('')}`;
+  // satu kartu per jadwal; tiap hari: sakelar kerja, lalu jam masuk–pulang (hari libur: tulisan Libur)
+  const rows = (days, label) => ORDER.map((i) => {
+    const d = days[i];
+    const l = `${label} ${DAY_NAMES[i]}`;
+    return `<div class="hari-kerja${d ? '' : ' off'}" data-day="${i}"><span class="nama-hari">${DAY_NAMES[i]}</span>` +
+      `<input type="checkbox" class="saklar" name="work"${d ? ' checked' : ''} aria-label="${esc(l)} hari kerja">` +
+      `<span class="rentang"><input type="time" name="start" value="${d?.start ?? ''}" aria-label="${esc(l)} jam masuk"> – ` +
+      `<input type="time" name="end" value="${d?.end ?? ''}" aria-label="${esc(l)} jam pulang"></span><span class="libur-teks">Libur</span></div>`;
+  }).join('');
+  const others = data.schedules.map((s) => `<div class="panel jadwal-kartu" data-sched="${esc(s.id)}"><header>` +
+    `<input class="senyap" name="sname" value="${esc(s.name)}" aria-label="Nama jadwal">` +
+    `<button data-hapus="${esc(s.id)}" class="mini bahaya">Hapus</button></header>${rows(s.days, s.name)}</div>`);
+  $('p-jadwal').innerHTML = `<div class="panel jadwal-kartu" data-sched=""><header><div><h3>Utama</h3>` +
+    `${others.length ? '<p>Untuk karyawan tanpa jadwal lain</p>' : ''}</div></header>${rows(data.schedule.days, 'Utama')}</div>${others.join('')}`;
   for (const [key, id] of Object.entries(NUMBERS)) $(id).value = data.schedule[key];
   $('p-lembur-aktif').checked = data.schedule.overtimeOn !== false;
   $('p-lembur').disabled = data.schedule.overtimeOn === false;
-  $('p-libur').innerHTML = data.holidays
-    .map((h) => `<tr><td>${dmy(h.date)}</td><td>${esc(h.note)}</td>` +
-      `<td><button data-date="${h.date}" class="bahaya" aria-label="Hapus libur ${dmy(h.date)}">Hapus</button></td></tr>`)
-    .join('') || '<tr><td colspan="3" class="muted">Belum ada hari libur. Libur nasional belum terisi otomatis.</td></tr>';
+  const t = today();
+  const days = (h) => Math.round((Date.parse(h.date) - Date.parse(t)) / 86_400_000);
+  const when = (n) => (n === 0 ? 'hari ini' : n > 0 ? `${n} hari lagi` : `${-n} hari lalu`);
+  const item = (h) => `<li><span class="tgl"><b>${Number(h.date.slice(8))}</b><span>${monthName(h.date.slice(0, 7)).slice(0, 3)}</span></span>` +
+    `<span class="dua">${esc(h.note || 'Libur')}<small>${dayName(h.date)}, ${dmy(h.date)}, ${when(days(h))}</small></span>` +
+    `<button data-date="${h.date}" class="mini bahaya" aria-label="Hapus libur ${dmy(h.date)}">Hapus</button></li>`;
+  const next = data.holidays.filter((h) => h.date >= t);
+  const past = data.holidays.filter((h) => h.date < t).reverse();
+  $('p-libur').innerHTML = (next.length ? `<ul class="libur-list">${next.map(item).join('')}</ul>`
+    : '<p class="muted">Belum ada hari libur yang akan datang. Tambahkan tanggal di atas.</p>') +
+    (past.length ? `<details class="lipat"><summary>Sudah lewat (${past.length})</summary><ul class="libur-list lewat">${past.map(item).join('')}</ul></details>` : '');
+  $('p-port').textContent = port;
+  invoke('lan_ip').then((ip) => ($('p-ip').textContent = ip ?? 'IP komputer ini (lihat pengaturan jaringan)'));
   renderBackup();
 }
 
@@ -133,9 +150,12 @@ async function renderBackup() {
   $('p-folder').textContent = await backupFolder();
   const last = data.backup.last;
   const old = !last || last.slice(0, 10) < addDays(today(), -BACKUP_WARN_DAYS);
-  $('p-backup-info').className = old ? 'off' : '';
-  $('p-backup-info').textContent = (last ? `Backup terakhir ${dmy(last.slice(0, 10))} ${last.slice(11)}.` : 'Belum pernah backup.') +
-    (old && last ? ` Sudah lebih dari ${BACKUP_WARN_DAYS} hari: periksa folder backup, lalu tekan Backup sekarang.` : '');
+  $('p-backup-status').className = `status-backup${old ? ' off' : ''}`;
+  $('p-backup-info').textContent = !last ? 'Belum pernah backup'
+    : `Backup terakhir ${last.slice(0, 10) === today() ? 'hari ini' : dmy(last.slice(0, 10))}, pukul ${last.slice(11)}`;
+  $('p-backup-sub').textContent = old
+    ? `${last ? `Sudah lebih dari ${BACKUP_WARN_DAYS} hari. ` : ''}Periksa folder di bawah, lalu tekan Backup sekarang.`
+    : 'Backup berikutnya dibuat otomatis besok saat aplikasi pertama kali hidup.';
 }
 
 /** Backup otomatis: sekali sehari saat aplikasi pertama kali hidup hari itu (PC tidak menyala 24 jam). */
@@ -150,7 +170,7 @@ async function backupNow(manual) {
     await saveData(null);
     if (manual) notify(`Backup tersimpan: ${file}`);
   } catch (e) {
-    notify(`Backup gagal: ${e}. Periksa folder backup di Pengaturan.`, true);
+    notify(`Backup gagal: ${e}. Periksa folder backup di menu Backup.`, true);
   }
   renderBackup();
 }

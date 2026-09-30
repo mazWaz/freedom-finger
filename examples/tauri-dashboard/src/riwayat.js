@@ -1,30 +1,39 @@
-// Tab Riwayat: semua scan dalam rentang tanggal, cari karyawan, pilih mesin, export dan cetak.
-// Koreksi absen (izin.js) ikut tampil bertanda "manual" beserta alasannya, kecuali saat satu mesin dipilih.
-import { $, data, devices, dmy, esc, exportCsv, exportXlsx, logs, nameOf, print, range, reportTitle } from './app.js';
-import { correctionScans, minutes } from './hitung-rekap.js';
+// Tab Riwayat, dua tampilan untuk rentang tanggal terpilih, keduanya bisa dicari, di-export, dan dicetak:
+// - Per hari (bawaan): daftar hadir, karyawan ke bawah dan tanggal ke samping. Tiap sel jam masuk dan pulang,
+//   berwarna menurut hitungan yang sama dengan Rekap (recapAll): terlambat, izin/sakit/cuti/dinas, tidak
+//   masuk, libur. Hari ini ikut tampil; yang belum scan hari ini belum dianggap tidak masuk.
+// - Semua scan: tiap scan dikelompokkan per hari, bisa dipilih per mesin.
+// Koreksi absen (izin.js) ikut dihitung dan bertanda "manual", kecuali saat satu mesin dipilih.
+import {
+  $, data, dayName, devices, esc, exportCsv, exportXlsx, hhmm, inRecap, knownPins, logs, longDate, monthName, nameOf, print, ranges,
+  reportTitle, today,
+} from './app.js';
+import { LEAVE_KINDS, addDays, correctionScans, minutes } from './hitung-rekap.js';
 import { STATUS, VERIFY } from './hari-ini.js';
+import { LABEL, recapAll } from './rekap.js';
 
 let rows = []; // hasil get_attlog untuk rentang terpilih, terbaru dulu
 let loaded = ''; // rentang + mesin yang sudah diambil
 let seq = 0; // hanya jawaban permintaan terakhir yang dipakai (ganti rentang cepat-cepat)
+let view = 'hari'; // 'hari' = daftar hadir per hari, 'scan' = semua scan
+/** Mesin terpilih; hanya di tampilan Semua scan (daftar hadir selalu dari semua mesin). */
+const machine = () => (view === 'scan' ? $('r-mesin').value : '');
 
 export function init() {
-  const setRange = () => ([$('r-dari').value, $('r-sampai').value] = range($('r-rentang').value));
-  $('r-rentang').onchange = () => {
-    if ($('r-rentang').value === 'custom') return;
-    setRange();
-    show('open');
-  };
-  $('r-dari').onchange = $('r-sampai').onchange = () => {
-    $('r-rentang').value = 'custom';
-    show('open');
-  };
+  [$('r-dari').value, $('r-sampai').value] = ranges()['Bulan ini'];
+  $('r-dari').onchange = () => show('open'); // rentang (tanggal.js): sekali, di input dari
   $('r-mesin').onchange = () => show('open');
   $('r-cari').oninput = render;
-  $('r-xlsx').onclick = () => exportXlsx(`${file()}.xlsx`, [table()]);
-  $('r-csv').onclick = () => exportCsv(`${file()}.csv`, table());
-  $('r-cetak').onclick = () => print($('r-judul'), table().title);
-  setRange();
+  $('r-tampilan').onclick = (e) => {
+    const b = e.target.closest('button[data-v]');
+    if (!b || b.dataset.v === view) return;
+    view = b.dataset.v;
+    show('view');
+  };
+  const current = () => (view === 'hari' ? sheetTable() : table());
+  $('r-xlsx').onclick = () => exportXlsx(`${file()}.xlsx`, [current()]);
+  $('r-csv').onclick = () => exportCsv(`${file()}.csv`, current());
+  $('r-cetak').onclick = () => print($('r-judul'), current().title);
 }
 
 const file = () => `riwayat-absen-${$('r-dari').value}_${$('r-sampai').value}`;
@@ -37,12 +46,16 @@ export async function show(reason) {
     $('r-mesin').value = devices.some((d) => d.cloud_id === keep) ? keep : '';
     $('r-mesin').dataset.opts = opts;
   }
-  $('r-mesin').hidden = devices.length < 2;
+  $('r-mesin').hidden = devices.length < 2 || view !== 'scan';
+  $('riwayat').classList.toggle('satu-mesin', devices.length < 2); // kolom Mesin selalu sama: sembunyikan
+  for (const b of $('r-tampilan').children) b.setAttribute('aria-pressed', b.dataset.v === view);
+  $('r-hari').hidden = view !== 'hari';
+  $('r-scan').hidden = view !== 'scan';
   const [from, to] = [$('r-dari').value, $('r-sampai').value];
-  const want = `${from} ${to} ${$('r-mesin').value}`;
+  const want = `${from} ${to} ${machine()}`;
   if (from && to && (reason === 'open' || reason === 'logs' || loaded !== want)) {
     const my = ++seq;
-    const list = from <= to ? await logs(from, to, $('r-mesin').value) : [];
+    const list = from <= to ? await logs(from, to, machine()) : [];
     if (my !== seq) return;
     rows = list.sort((a, b) => b.scan_date.localeCompare(a.scan_date));
     loaded = want;
@@ -52,7 +65,7 @@ export async function show(reason) {
 
 /** Scan mesin ditambah koreksi manual, terbaru dulu. */
 function all() {
-  if ($('r-mesin').value) return rows;
+  if (machine()) return rows;
   return [...rows, ...correctionScans(data.corrections, $('r-dari').value, $('r-sampai').value)].sort((a, b) => b.scan_date.localeCompare(a.scan_date));
 }
 
@@ -65,16 +78,29 @@ function visible(list = all()) {
 const button = (l) => (l.manual ? '' : (STATUS[l.status_scan] ?? String(l.status_scan)));
 const verify = (l) => (l.manual ? 'Manual' : (VERIFY[l.verify] ?? String(l.verify)));
 
-function render() {
+const render = () => (view === 'hari' ? renderSheet() : renderLog());
+
+function renderLog() {
   const every = all();
   const list = visible(every);
   const manual = list.filter((l) => l.manual).length;
-  $('r-info').textContent = `${list.length} scan${list.length === every.length ? '' : ` dari ${every.length}`}${manual ? `, ${manual} di antaranya koreksi manual` : ''}`;
+  $('r-info').innerHTML = `<span><b>${list.length}</b> scan${list.length === every.length ? '' : ` dari ${every.length}`}</span>` +
+    (manual ? `<span><b>${manual}</b> koreksi manual</span>` : '');
+  // satu judul per hari; baris hanya jam, nama (PIN di bawahnya), tombol, dan verifikasi
+  const perDay = new Map();
+  for (const l of list) perDay.set(l.scan_date.slice(0, 10), (perDay.get(l.scan_date.slice(0, 10)) ?? 0) + 1);
+  let day = '';
   $('r-daftar').innerHTML = list
-    .map((l) => `<tr${l.manual ? ' class="manual"' : ''}><td>${dmy(l.scan_date.slice(0, 10))}</td><td>${l.scan_date.slice(11, 16)}</td>` +
-      `<td>${esc(nameOf(l.pin))}</td><td>${esc(l.pin)}</td><td>${esc(button(l))}</td><td>${esc(verify(l))}</td>` +
-      `<td>${esc(l.cloud_id)}</td><td>${esc(l.reason)}</td></tr>`)
-    .join('');
+    .map((l) => {
+      const d = l.scan_date.slice(0, 10);
+      const head = d === day ? '' : `<tr class="hari"><th colspan="5">${dayName(d)}, ${Number(d.slice(8))} ${monthName(d.slice(0, 7))}<span>${perDay.get(d)} scan</span></th></tr>`;
+      day = d;
+      return `${head}<tr${l.manual ? ' class="manual"' : ''}><td class="jam">${l.scan_date.slice(11, 16)}</td>` +
+        `<td><span class="dua">${esc(nameOf(l.pin))}<small>PIN ${esc(l.pin)}</small></span></td><td>${esc(button(l))}</td>` +
+        `<td>${l.manual ? `<span class="lencana">Manual</span><span>${esc(l.reason)}</span>` : esc(verify(l))}</td>` +
+        `<td class="mesin">${esc(l.cloud_id)}</td></tr>`;
+    })
+    .join('') || `<tr><td colspan="5" class="muted">${every.length ? 'Tidak ada scan yang cocok dengan pencarian.' : 'Belum ada scan di rentang ini.'}</td></tr>`;
 }
 
 function table() {
@@ -92,5 +118,99 @@ function table() {
       { title: 'Keterangan', kind: 'text', width: 30 },
     ],
     rows: visible().map((l) => [l.scan_date.slice(0, 10), minutes(l.scan_date, 11), nameOf(l.pin), l.pin, button(l), verify(l), l.cloud_id, l.reason]),
+  };
+}
+
+// --- per hari: daftar hadir -------------------------------------------------------------------
+
+/** Karyawan yang cocok dengan pencarian (urut nama), tanggal urut sampai hari ini, dan hasil recap per sel. */
+function sheet() {
+  const [from, to] = [$('r-dari').value, $('r-sampai').value];
+  const now = today();
+  const last = to < now ? to : now;
+  const scans = all();
+  const q = $('r-cari').value.trim().toLowerCase();
+  const pins = [...new Set([...knownPins(), ...scans.map((s) => s.pin)])].filter(inRecap)
+    .filter((pin) => !q || pin.includes(q) || nameOf(pin).toLowerCase().includes(q))
+    .sort((a, b) => nameOf(a).localeCompare(nameOf(b), 'id'));
+  const days = new Map(); // "PIN tanggal" -> hari dari recap(); hari ini ikut dihitung (until = besok)
+  const dates = [];
+  if (from && from <= last) {
+    for (const r of recapAll(scans, pins, from, last, addDays(now, 1))) for (const d of r.days) days.set(`${r.pin} ${d.date}`, d);
+    for (let d = from; d <= last; d = addDays(d, 1)) dates.push(d);
+  }
+  const manual = new Set(data.corrections.map((c) => `${c.pin} ${c.date} ${c.time}`));
+  return { pins, dates, now, cell: (pin, date) => cell(days.get(`${pin} ${date}`), date === now, (t) => manual.has(`${pin} ${date} ${t}`)) };
+}
+
+/**
+ * Isi satu sel: `kind` untuk warna, `in`/`out` jam, `text` untuk yang tanpa jam, dan `about` (kalimat
+ * lengkapnya). Pulang "?" = hari sudah lewat tanpa absen pulang.
+ */
+function cell(d, isToday, isManual) {
+  if (!d) return { kind: '', text: '', about: '' };
+  if (LEAVE_KINDS.includes(d.status)) return { kind: 'izin', text: LABEL[d.status], about: LABEL[d.status] };
+  if (d.status === 'alpa') return isToday ? { kind: '', text: '', about: 'belum scan' } : { kind: 'alpa', text: 'Alpa', about: 'tidak masuk' };
+  if (d.in == null) return { kind: 'libur', text: '', about: `libur${d.note ? `: ${d.note}` : ''}` };
+  const out = d.out != null ? hhmm(d.out) : d.noOut && !isToday ? '?' : '';
+  const about = [`masuk ${hhmm(d.in)}`, d.late && `terlambat ${d.late} menit`, out === '?' ? 'tanpa absen pulang' : out && `pulang ${out}`,
+    d.early && `${d.early} menit sebelum jam pulang`, d.status === 'libur' && 'di hari libur'].filter(Boolean).join(', ');
+  return { kind: d.status === 'libur' ? 'libur' : d.late ? 'telat' : '', in: hhmm(d.in), out, late: d.late, early: d.early,
+    manualIn: isManual(hhmm(d.in)), manualOut: d.out != null && isManual(out), about };
+}
+
+const shortDate = (date) => `${Number(date.slice(8))} ${monthName(date).slice(0, 3)}`;
+let scrolledFor = ''; // rentang yang tabelnya sudah digulir ke tanggal terakhir
+
+function renderSheet() {
+  const { pins, dates, now, cell: at } = sheet();
+  if (!pins.length) {
+    const q = $('r-cari').value.trim();
+    $('r-kepala').innerHTML = '<tr><th>Karyawan</th></tr>';
+    $('r-baris').innerHTML = `<tr><th scope="row" class="kosong-sel">${q ? `Tidak ada karyawan yang cocok dengan "${esc(q)}".` : 'Belum ada data karyawan. Ambil dari mesin di menu Karyawan.'}</th></tr>`;
+    return;
+  }
+  const holidays = new Map(data.holidays.map((h) => [h.date, h.note]));
+  // kolom tanggal: abu-abu bila libur untuk semua orang, hijau untuk hari ini; keterangan libur di title
+  $('r-kepala').innerHTML = `<tr><th>Karyawan</th>${dates.map((date) => {
+    const cls = [date === now && 'sekarang', pins.every((pin) => at(pin, date).kind === 'libur') && 'libur-semua'].filter(Boolean).join(' ');
+    const note = holidays.get(date) ?? (date === now ? 'hari ini' : '');
+    return `<th scope="col"${cls ? ` class="${cls}"` : ''} title="${dayName(date)} ${longDate(date)}${note ? `, ${esc(note)}` : ''}">` +
+      `<b>${dayName(date).slice(0, 3)}</b>${shortDate(date)}</th>`;
+  }).join('')}</tr>`;
+  $('r-baris').innerHTML = pins.map((pin) => `<tr><th scope="row" title="${esc(nameOf(pin))}, PIN ${esc(pin)}">${esc(nameOf(pin))}</th>` +
+    dates.map((date) => {
+      const c = at(pin, date);
+      return `<td class="${c.kind}" title="${esc(nameOf(pin))}, ${dayName(date)} ${longDate(date)}: ${esc(c.about)}">` +
+        (c.in
+          ? `<b${c.manualIn ? ' class="manual"' : ''}>${c.in}${c.late ? `<small>+${c.late}</small><span class="sr-only"> terlambat</span>` : ''}</b>` +
+            `<span class="${[c.out === '?' && 'tanpa', c.early && 'cepat', c.manualOut && 'manual'].filter(Boolean).join(' ')}">${c.out}` +
+            `${c.out === '?' ? '<span class="sr-only"> tanpa absen pulang</span>' : ''}</span>`
+          : c.text) +
+        '</td>';
+    }).join('') + '</tr>').join('');
+  // rentang baru: tampilkan tanggal terakhir (biasanya hari ini) di ujung kanan; setelah itu posisi gulir pengguna dibiarkan
+  const range = `${$('r-dari').value} ${$('r-sampai').value}`;
+  if (scrolledFor !== range && !$('r-hari').hidden) {
+    const box = document.querySelector('.matriks-bungkus');
+    box.scrollLeft = box.scrollWidth;
+    scrolledFor = range;
+  }
+}
+
+/** Daftar hadir untuk export: satu baris per karyawan, satu kolom per tanggal, isinya teks pendek. */
+function sheetTable() {
+  const { pins, dates, cell: at } = sheet();
+  const text = (c) => {
+    if (!c.in) return c.text || (c.kind === 'libur' ? 'Libur' : '');
+    const notes = [c.late && `terlambat ${c.late} mnt`, c.out === '?' && 'tanpa pulang'].filter(Boolean);
+    return `${c.in}${c.out && c.out !== '?' ? `–${c.out}` : ''}${notes.length ? ` (${notes.join(', ')})` : ''}`;
+  };
+  return {
+    name: 'Riwayat',
+    title: reportTitle('Riwayat absen', $('r-dari').value, $('r-sampai').value),
+    columns: [{ title: 'Nama', kind: 'text', width: 24 }, { title: 'PIN', kind: 'text', width: 7 },
+      ...dates.map((date) => ({ title: `${dayName(date).slice(0, 3)} ${shortDate(date)}`, kind: 'text', width: 13 }))],
+    rows: pins.map((pin) => [nameOf(pin), pin, ...dates.map((date) => text(at(pin, date)))]),
   };
 }

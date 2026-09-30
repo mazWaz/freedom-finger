@@ -26,6 +26,12 @@ export const correctionScans = (corrections, from, to) => corrections
 export const minutes = (s, at = 0) => Number(s.slice(at, at + 2)) * 60 + Number(s.slice(at + 3, at + 5));
 const DAY_MS = 86_400_000;
 export const addDays = (date, n) => new Date(Date.parse(`${date}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
+/** Geser `n` bulan; tanggal yang tidak ada di bulan tujuan (31 Maret - 1 bulan) menjadi tanggal terakhirnya. */
+export function addMonths(date, n) {
+  const [y, m, d] = date.split('-').map(Number);
+  const last = new Date(Date.UTC(y, m + n, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m - 1 + n, Math.min(d, last))).toISOString().slice(0, 10);
+}
 /** 0 = Minggu */
 export const weekday = (date) => new Date(`${date}T00:00:00Z`).getUTCDay();
 

@@ -21,6 +21,7 @@
         }
       }
       * { box-sizing: border-box; }
+      [hidden] { display: none !important; } /* juga elemen yang display-nya diatur CSS (flex, grid) */
       html, body { height: 100%; }
       body {
         margin: 0; background: var(--kertas); color: var(--tinta);
@@ -48,6 +49,8 @@
         height: 32px; padding: 0 13px; border: 1px solid var(--garis); border-radius: 7px; background: var(--muka);
         font-weight: 550; cursor: pointer; white-space: nowrap;
       }
+      button { display: inline-flex; align-items: center; gap: 6px; }
+      button svg { width: 16px; height: 16px; flex: none; }
       button:hover:not(:disabled) { background: var(--sorot); }
       button:disabled { opacity: 0.5; cursor: default; }
       button.utama { background: var(--hijau); border-color: var(--hijau); color: #fff; }
@@ -58,6 +61,35 @@
       input:focus-visible, select:focus-visible { outline-offset: 0; border-color: var(--hijau); }
       label { display: inline-flex; gap: 8px; align-items: center; }
       .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
+
+      /* --- pemilih tanggal (tanggal.js) --------------------------------------------------------- */
+      button.pilih-tanggal { font-weight: 450; gap: 8px; padding: 0 11px; }
+      button.pilih-tanggal svg { color: var(--redup); }
+      .bidang button.pilih-tanggal { width: 100%; height: 36px; font-weight: 400; }
+      .kalender {
+        inset: auto; margin: 0; padding: 0; border: 1px solid var(--garis); border-radius: 10px;
+        background: var(--muka); color: var(--tinta); box-shadow: 0 12px 32px rgba(12, 16, 24, 0.16);
+      }
+      .kalender:popover-open { display: flex; }
+      .kalender button { border: 0; background: none; }
+      .kalender .preset { display: flex; flex-direction: column; gap: 1px; padding: 8px; border-right: 1px solid var(--garis); min-width: 158px; }
+      .kalender .preset button { height: 30px; padding: 0 10px; font-weight: 500; }
+      .kalender .preset button[aria-pressed="true"] { background: var(--hijau-muda); color: var(--hijau); font-weight: 650; }
+      .kalender .bulan { width: 272px; padding: 10px 12px 12px; }
+      .kalender header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+      .kalender header b { font-weight: 650; }
+      .kalender header button { width: 32px; padding: 0; justify-content: center; color: var(--redup); }
+      .kalender .hari { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; }
+      .kalender .hari span { height: 26px; line-height: 26px; text-align: center; font-size: 12px; font-weight: 600; color: var(--redup); }
+      .kalender .hari button { height: 34px; padding: 0; justify-content: center; font-weight: 500; }
+      .kalender .hari .lain { color: var(--redup); opacity: 0.6; }
+      .kalender .hari .ini { box-shadow: inset 0 0 0 1px var(--hijau); }
+      .kalender .hari .antara { background: var(--hijau-muda); border-radius: 0; }
+      .kalender .hari .pilih, .kalender .hari .pilih:hover:not(:disabled) { background: var(--hijau); color: #fff; opacity: 1; }
+      @media (prefers-color-scheme: dark) { .kalender .hari .pilih { color: #0f1a13; } }
+      .kalender .petunjuk { margin: 8px 2px 0; font-size: 12.5px; color: var(--redup); }
+      .kalender .bawah { display: flex; justify-content: space-between; margin-top: 8px; }
+      .kalender .bawah button { height: 30px; padding: 0 8px; color: var(--hijau); }
       .spacer { flex: 1; }
       .form p { margin: 10px 0; }
 
@@ -94,14 +126,16 @@
       .kelompok { font-size: 12px; color: var(--redup); margin: 16px 10px 4px; }
       .samping nav button {
         border: 0; background: none; text-align: left; height: 34px; padding: 0 10px; border-radius: 7px; color: var(--redup);
-        font-weight: 550; font-size: 14px;
+        font-weight: 550; font-size: 14px; display: flex; align-items: center; justify-content: flex-start; gap: 10px;
       }
+      .samping svg { width: 18px; height: 18px; stroke-width: 1.8; flex: none; }
       .samping nav button:hover { background: var(--sorot); color: var(--tinta); }
       .samping nav button[aria-current="page"] { background: var(--hijau-muda); color: var(--hijau); font-weight: 650; }
       .kaki { margin-top: auto; padding: 14px 8px 0; font-size: 12.5px; }
       .kaki p { margin: 0 0 10px; display: flex; gap: 7px; align-items: baseline; }
       .kaki p::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
-      .kaki button { width: 100%; }
+      .kaki button { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+      .kaki svg { width: 16px; height: 16px; }
       main { overflow-y: auto; background: var(--muka); }
       main > section { padding: 26px 32px 48px; max-width: 1180px; }
       .kepala { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 0 0 18px; }
@@ -116,9 +150,39 @@
       }
       .pita .titik.telat { background: var(--merah); }
       .pita .titik.lagi { background: var(--muka); border: 1.5px solid var(--redup); width: 8px; height: 8px; margin-left: -4px; }
+      /* arahkan kursor ke titik: nama dan jamnya muncul, scan lain orang itu tetap terang, yang lain meredup */
+      .pita .titik::before { content: ''; position: absolute; inset: -4px; } /* sasaran kursor lebih besar dari titiknya */
+      .pita .titik::after {
+        content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+        padding: 4px 9px; border-radius: 6px; background: var(--tinta); color: var(--muka); font-size: 12px; font-weight: 600;
+        white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.1s;
+      }
+      .pita .titik.kiri::after { left: -6px; transform: none; }
+      .pita .titik.kanan::after { left: auto; right: -6px; transform: none; }
+      .pita .titik:hover { z-index: 1; outline: 2px solid var(--tinta); outline-offset: 2px; }
+      .pita .titik:hover::after { opacity: 1; }
+      .pita .titik { transition: opacity 0.12s; }
+      .pita.sorot .titik:not(.ini) { opacity: 0.2; }
+      @media (prefers-reduced-motion: reduce) { .pita .titik, .pita .titik::after { transition: none; } }
+      /* judul bagian dengan isian di kanan (legenda, kotak cari) */
+      .judul-baris { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin: 0 0 12px; }
+      .judul-baris > * { margin: 0; }
+      .judul-baris > :not(:first-child) { margin-left: auto; } /* yang tampil hanya satu */
+      .judul-baris + .pita { margin-top: 34px; }
+      #papan-cari { width: 220px; }
+      /* halaman (app.js paginate) */
+      .halaman { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 12px 0 0; font-size: 13px; color: var(--redup); }
+      .halaman > span:first-child { margin-right: auto; }
+      .halaman button { min-width: 32px; padding: 0 8px; justify-content: center; border-color: transparent; background: none; color: var(--tinta); }
+      .halaman button[aria-current="page"] { background: var(--tinta); border-color: var(--tinta); color: var(--muka); }
+      .halaman > span[aria-hidden] { padding: 0 4px; }
       .pita .jam { position: absolute; top: calc(100% + 6px); transform: translateX(-50%); font-size: 11.5px; color: var(--redup); }
       .pita .garis { position: absolute; top: -22px; bottom: 0; border-left: 1px dashed var(--hijau); }
-      .pita .garis span { position: absolute; top: 0; left: 5px; font-size: 11.5px; color: var(--hijau); white-space: nowrap; }
+      .pita .garis span {
+        position: absolute; z-index: 1; top: 0; left: 5px; font-size: 11.5px; color: var(--hijau); white-space: nowrap;
+        text-shadow: -2px 0 var(--muka), 2px 0 var(--muka), 0 -2px var(--muka), 0 2px var(--muka); /* garis lain yang lewat tidak memotong tulisan */
+      }
+      .pita .garis.balik span { left: auto; right: 5px; } /* dekat tepi kanan: label di kiri garis */
       .pita .toleransi { position: absolute; top: -22px; bottom: 0; background: var(--hijau-muda); }
       .pita .sekarang { position: absolute; top: -8px; bottom: -4px; border-left: 2px solid var(--redup); opacity: 0.6; }
       .legenda { font-size: 12.5px; margin: 0 0 16px; }
@@ -128,6 +192,255 @@
       .legenda i.lagi { background: none; border: 1.5px solid var(--redup); }
       .daftar-nama { margin: 0 0 6px; max-width: 80ch; }
       .daftar-nama span { color: var(--redup); }
+
+      /* --- hari ini: saring dan papan absen --------------------------------------------------
+         Satu kartu per karyawan, bertinta seperti kartu jam kerja: hijau tepat waktu, merah terlambat,
+         biru izin, garis putus-putus belum datang. Kartu dibuka untuk mencatat izin atau koreksi. */
+      .saring { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 14px; }
+      .saring button {
+        height: 30px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 7px;
+        color: var(--redup); font-weight: 600;
+      }
+      .saring button b { color: var(--tinta); font-weight: 750; }
+      .saring button[aria-pressed="true"] { background: var(--tinta); border-color: var(--tinta); color: var(--muka); }
+      .saring button[aria-pressed="true"] b { color: var(--muka); }
+      .saring i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+      .saring .belum i { border: 1.5px dashed currentColor; }
+      .saring .telat i { background: var(--merah); } .saring .tepat i { background: var(--hijau); } .saring .izin i { background: var(--izin); }
+      .papan { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 0 0 6px; }
+      .kartu {
+        height: auto; display: grid; gap: 1px; text-align: left; padding: 10px 14px 11px; border-radius: 10px; white-space: normal;
+        border: 1px solid var(--garis); border-left: 4px solid var(--hijau); background: var(--muka); font-weight: 400;
+      }
+      .kartu .nama { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .kartu .jam { font-size: 21px; font-weight: 750; letter-spacing: -0.01em; line-height: 1.3; }
+      .kartu .status { font-size: 12.5px; font-weight: 650; letter-spacing: 0; margin-left: 6px; color: var(--hijau); }
+      .kartu .ket { font-size: 12.5px; color: var(--redup); }
+      .kartu.telat { border-left-color: var(--merah); } .kartu.telat .jam, .kartu.telat .status { color: var(--merah); }
+      .kartu.izin { border-left-color: var(--izin); } .kartu.izin .jam, .kartu.izin .status { color: var(--izin); }
+      .kartu.belum { border-style: dashed; border-left: 4px solid var(--garis); background: transparent; }
+      .kartu.belum .jam { color: var(--redup); font-weight: 600; font-size: 15px; line-height: 1.85; }
+      .kartu.luar { border-left-color: var(--redup); } .kartu.luar .status { color: var(--redup); }
+      .kartu.baru { animation: baru 2.4s ease-out; }
+      .kartu-status { margin: 0; font-size: 16px; } .kartu-status.telat { color: var(--merah); }
+      .kartu-status.tepat { color: var(--hijau); } .kartu-status.izin { color: var(--izin); } .kartu-status.belum, .kartu-status.luar { color: var(--redup); }
+      .kosong { padding: 18px; border: 1px dashed var(--garis); border-radius: 10px; color: var(--redup); }
+      .catatan { padding: 10px 14px; border-radius: 8px; background: var(--merah-muda); margin: 0 0 14px; }
+      .catatan.info { background: var(--sorot); }
+      details.lipat > summary {
+        list-style: none; cursor: pointer; display: flex; align-items: center; gap: 9px; width: fit-content;
+        font-size: 15px; font-weight: 650; margin: 26px 0 10px;
+      }
+      details.lipat > summary::-webkit-details-marker { display: none; }
+      details.lipat > summary::before {
+        content: ''; width: 6px; height: 6px; border-right: 2px solid var(--redup); border-bottom: 2px solid var(--redup);
+        transform: rotate(-45deg); transition: transform 0.15s;
+      }
+      details.lipat[open] > summary::before { transform: rotate(45deg); }
+      .kepala .aksi { margin-left: auto; display: flex; gap: 8px; align-self: center; }
+
+      /* --- laci: panel samping untuk form izin/koreksi dan rincian satu karyawan -------------- */
+      dialog.laci {
+        position: fixed; inset: 0 0 0 auto; width: min(420px, 100vw); max-width: 100vw; height: 100%; max-height: 100%;
+        margin: 0; padding: 0; border: 0; border-left: 1px solid var(--garis); background: var(--muka); color: var(--tinta);
+        box-shadow: -16px 0 40px rgba(0, 0, 0, 0.16);
+      }
+      dialog.laci[open] { display: flex; flex-direction: column; animation: laci-masuk 0.18s ease-out; }
+      dialog.laci::backdrop { background: rgba(12, 16, 24, 0.32); }
+      @keyframes laci-masuk { from { transform: translateX(28px); opacity: 0; } }
+      .laci-kepala { display: flex; align-items: flex-start; gap: 12px; padding: 20px 22px 16px; border-bottom: 1px solid var(--garis); }
+      .laci-kepala h2 { margin: 0; font-size: 18px; }
+      .laci-kepala p { margin: 3px 0 0; color: var(--redup); }
+      .laci-kepala button { margin-left: auto; border: 0; background: none; font-size: 22px; line-height: 1; padding: 0 10px; color: var(--redup); }
+      .laci-isi { flex: 1; overflow-y: auto; padding: 18px 22px 22px; display: flex; flex-direction: column; gap: 14px; }
+      .laci-isi[hidden] { display: none; }
+      .bidang { display: flex; flex-direction: column; align-items: stretch; gap: 6px; font-weight: 600; font-size: 13px; border: 0; padding: 0; margin: 0; min-width: 0; }
+      .bidang legend { padding: 0; margin-bottom: 6px; }
+      .bidang input:not([type="radio"]):not([type="checkbox"]), .bidang select { width: 100%; height: 36px; font-weight: 400; }
+      .bidang small { font-weight: 400; font-size: 12.5px; color: var(--redup); }
+      .baris { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .pilihan { display: flex; flex-wrap: wrap; gap: 6px; }
+      .pilihan label { height: 34px; padding: 0 12px; border: 1px solid var(--garis); border-radius: 8px; font-weight: 550; cursor: pointer; }
+      .pilihan input { accent-color: var(--izin); margin: 0; }
+      .laci-kaki { display: flex; gap: 8px; justify-content: flex-end; margin-top: auto; padding-top: 6px; }
+      .laci-kaki button { height: 36px; }
+      .kecil { font-size: 12.5px; }
+      .scan-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--garis); }
+      .scan-list li { display: flex; gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--garis); }
+      .scan-list b { font-size: 16px; min-width: 3.2em; }
+      .tindakan { display: flex; flex-direction: column; gap: 8px; }
+      .tindakan button { height: 38px; }
+      @media (prefers-reduced-motion: reduce) { dialog.laci[open] { animation: none; } details.lipat > summary::before { transition: none; } }
+
+      /* --- tahap 2: komponen bersama tab laporan dan kelola -------------------------------- */
+      .grup { display: inline-flex; }
+      .grup button { border-radius: 0; margin-left: -1px; }
+      .grup button:first-child { border-radius: 7px 0 0 7px; margin-left: 0; }
+      .grup button:last-child { border-radius: 0 7px 7px 0; }
+      .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; margin: 0 0 16px; font-size: 13px; color: var(--redup); }
+      .meta b { color: var(--tinta); font-weight: 600; }
+      .meta button { height: 28px; font-size: 12.5px; }
+      /* keterangan di atas tabel (Rekap, Karyawan): kotak, satu hal per baris dengan ikonnya; angka penting bertinta tebal */
+      .keterangan { margin: 0 0 16px; border: 1px solid var(--garis); border-radius: 10px; background: var(--sorot); font-size: 13px; line-height: 1.5; color: var(--redup); }
+      .keterangan p { display: flex; align-items: center; gap: 10px; margin: 0; padding: 9px 14px; }
+      .keterangan p + p { border-top: 1px solid var(--garis); }
+      .keterangan svg { width: 16px; height: 16px; flex: none; color: var(--hijau); }
+      .keterangan span { flex: 1; }
+      .keterangan b { color: var(--tinta); font-weight: 600; }
+      .keterangan button { height: auto; padding: 0; border: 0; background: none; color: var(--hijau); font-size: inherit; font-weight: 600; }
+      .keterangan button:hover { background: none; text-decoration: underline; text-underline-offset: 3px; }
+      .dua { display: block; line-height: 1.3; } .dua small { display: block; font-size: 12px; color: var(--redup); font-weight: 400; }
+      .lencana { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 650; background: var(--sorot); color: var(--redup); white-space: nowrap; }
+      .lencana.alpa { background: var(--merah-muda); color: var(--merah); }
+      .lencana.hadir { background: var(--hijau-muda); color: var(--hijau); }
+      .lencana.izin, .lencana.sakit, .lencana.cuti, .lencana.dinas { background: rgba(45, 106, 143, 0.1); color: var(--izin); }
+      button.mini { height: 28px; padding: 0 10px; font-size: 12.5px; }
+      th.num { white-space: normal; } /* judul kolom angka boleh dua baris: tabel rekap muat di layar 1024 */
+      td.aksi { text-align: right; } td.aksi button { color: var(--tinta); background: var(--muka); } td.aksi button + button { margin-left: 4px; }
+      .rincian-kepala { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 12px; }
+      .rincian-kepala h2 { margin: 0; }
+      .satu-mesin .mesin { display: none; }
+      .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+      #y-daftar input:not([type="checkbox"]), #y-daftar select { width: 100%; height: 30px; }
+      #y-daftar tr[hidden] { display: none; }
+
+      /* mesin: satu kartu per mesin, jam dibanding PC dan hasil perintah di kartu itu sendiri */
+      .mesin-kartu { border: 1px solid var(--garis); border-radius: 12px; padding: 18px 20px; margin: 0 0 16px; }
+      .mesin-kartu > header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 14px; }
+      .mesin-kartu h2 { margin: 0; }
+      .status-titik { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+      .status-titik::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+      .info-mesin { display: grid; grid-template-columns: max-content 1fr; gap: 7px 22px; margin: 0 0 16px; font-size: 13.5px; }
+      .info-mesin dt { color: var(--redup); } .info-mesin dd { margin: 0; }
+      .jam-mesin { font-size: 17px; font-weight: 700; }
+      .hasil { list-style: none; margin: 12px 0 0; padding: 0; font-size: 13px; }
+      .hasil li { padding: 6px 0; border-top: 1px solid var(--garis); display: flex; gap: 10px; }
+      .hasil time { color: var(--redup); min-width: 3.4em; }
+
+      /* pengaturan: satu blok per topik, judul dan penjelasan di kiri, isian di kanan */
+      .blok { display: grid; grid-template-columns: minmax(180px, 240px) 1fr; gap: 12px 40px; padding: 24px 0; border-top: 1px solid var(--garis); }
+      .blok:first-of-type { border-top: 0; padding-top: 4px; }
+      .sempit { max-width: 640px; }
+      .sempit.isi { display: flex; flex-direction: column; gap: 14px; } .sempit.isi p { margin: 0; }
+      .blok > header h2 { margin: 0 0 4px; }
+      .blok > header p { margin: 0; color: var(--redup); font-size: 13px; }
+      .blok .isi { display: flex; flex-direction: column; gap: 14px; min-width: 0; max-width: 620px; }
+      .blok .isi p { margin: 0; }
+      .satuan { display: inline-flex; align-items: center; gap: 8px; font-weight: 400; }
+      .bidang .satuan input:not([type="radio"]):not([type="checkbox"]) { width: 6.5em; }
+      .centang { flex-direction: row; align-items: center; gap: 8px; font-weight: 550; }
+      @media (max-width: 900px) { .blok { grid-template-columns: 1fr; } }
+
+      /* --- halaman: tahap 3 (riwayat per hari, strip rekap, karyawan senyap, jadwal, libur, backup) --- */
+      .panel { border: 1px solid var(--garis); border-radius: 10px; padding: 16px 18px; background: var(--muka); }
+      h2.sub { margin: 22px 0 2px; } h2.sub + p { margin-bottom: 12px; }
+      input.saklar {
+        appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 999px; background: var(--garis);
+        position: relative; cursor: pointer; flex: none; margin: 0; transition: background 0.15s;
+      }
+      input.saklar::before {
+        content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s;
+      }
+      input.saklar:checked { background: var(--hijau); }
+      input.saklar:checked::before { transform: translateX(14px); }
+      input.saklar:focus-visible { outline-offset: 2px; }
+      input.senyap, select.senyap { border-color: transparent; background: transparent; width: 100%; }
+      tr:hover input.senyap, tr:hover select.senyap { border-color: var(--garis); }
+      input.senyap:focus, select.senyap:focus { border-color: var(--hijau); background: var(--muka); }
+      input.senyap.petunjuk::placeholder { color: transparent; }
+      tr:hover input.senyap.petunjuk::placeholder, input.senyap.petunjuk:focus::placeholder { color: var(--redup); }
+      th.tengah, td.tengah { text-align: center; }
+      /* riwayat: satu judul per hari */
+      table.log th.jam { width: 5em; }
+      table.log td.jam { font-weight: 650; }
+      table.log tr.hari th { background: var(--kertas); color: var(--tinta); font-size: 13px; font-weight: 650; padding: 7px 10px; }
+      table.log tr.hari th span { color: var(--redup); font-weight: 500; margin-left: 10px; }
+      table.log .lencana + span { margin-left: 8px; color: var(--redup); }
+      /* riwayat per hari: daftar hadir, tanggal ke bawah dan karyawan ke samping. Warna sama dengan strip Rekap:
+         tinta = tepat waktu, merah = terlambat, bingkai merah = tidak masuk, biru = izin, abu-abu = libur. */
+      .pilih-tampilan button[aria-pressed="true"] { background: var(--tinta); border-color: var(--tinta); color: var(--muka); position: relative; }
+      .legenda-sel { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 12.5px; margin: 0 0 10px; }
+      .legenda-sel i { width: 14px; height: 14px; border-radius: 3px; margin-left: 8px; } .legenda-sel i:first-child { margin-left: 0; }
+      .legenda-sel span { margin-left: 12px; } .legenda-sel b { color: var(--merah); } .legenda-sel u { text-decoration-style: dotted; text-underline-offset: 3px; color: var(--tinta); }
+      .matriks-bungkus { overflow: auto; max-height: calc(100vh - 240px); min-height: 180px; border: 1px solid var(--garis); border-radius: 10px; }
+      table.matriks { width: auto; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+      .matriks th, .matriks td { padding: 6px 8px; border-bottom: 1px solid var(--garis); border-right: 1px solid var(--garis); }
+      .matriks tr > :last-child { border-right: 0; } .matriks tbody tr:last-child > * { border-bottom: 0; }
+      .matriks thead th { min-width: 64px; vertical-align: bottom; text-align: center; color: var(--tinta); font-size: 12px; font-weight: 500; line-height: 1.3; white-space: nowrap; }
+      .matriks thead th b { display: block; font-weight: 650; }
+      .matriks thead th.sekarang { color: var(--hijau); box-shadow: inset 0 -2px var(--hijau); }
+      .matriks thead th.libur-semua { color: var(--redup); }
+      .matriks th:first-child {
+        position: sticky; left: 0; z-index: 1; min-width: 150px; max-width: 190px; background: var(--muka); text-align: left;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-shadow: 1px 0 var(--garis);
+      }
+      .matriks thead th:first-child { z-index: 3; color: var(--redup); }
+      .matriks tbody th { font-weight: 600; }
+      .matriks th.kosong-sel { color: var(--redup); font-weight: 400; max-width: none; white-space: normal; }
+      .matriks td { text-align: center; white-space: nowrap; line-height: 1.25; font-variant-numeric: tabular-nums; }
+      .matriks td b { display: block; font-weight: 650; }
+      .matriks td b small { font-size: 10.5px; margin-left: 2px; }
+      .matriks td > span { display: block; font-size: 12px; color: var(--redup); }
+      .matriks td > span.cepat, .matriks td > span.tanpa { color: var(--merah); font-weight: 650; }
+      .matriks td.telat { background: var(--merah-muda); color: var(--merah); }
+      .matriks td.izin { background: color-mix(in srgb, var(--izin) 13%, transparent); color: var(--izin); font-weight: 650; }
+      .matriks td.alpa { box-shadow: inset 0 0 0 1.5px var(--merah); color: var(--merah); font-weight: 650; }
+      .matriks td.libur { background: var(--sorot); color: var(--redup); }
+      .legenda-sel i.telat { background: var(--merah); } .legenda-sel i.izin { background: var(--izin); }
+      .legenda-sel i.alpa { box-shadow: inset 0 0 0 1.5px var(--merah); } .legenda-sel i.libur { background: var(--garis); }
+      .matriks .manual { text-decoration: underline dotted; text-underline-offset: 3px; }
+      /* rekap: strip bulan, satu batang per hari seperti lubang kartu absen */
+      .nama-rekap { display: block; font-weight: 650; }
+      .nama-rekap small { font-weight: 400; color: var(--redup); margin-left: 8px; }
+      .strip { display: flex; gap: 2px; margin-top: 5px; }
+      .strip i, .legenda-strip i { width: 5px; height: 12px; border-radius: 1.5px; background: var(--tinta); flex: none; }
+      .strip i.telat, .legenda-strip i.telat { background: var(--merah); }
+      .strip i.alpa, .legenda-strip i.alpa { background: none; box-shadow: inset 0 0 0 1.5px var(--merah); }
+      .strip i.izin, .legenda-strip i.izin { background: var(--izin); }
+      .strip i.libur, .legenda-strip i.libur { background: var(--garis); height: 4px; margin-top: 8px; }
+      .strip i.nanti { background: none; box-shadow: inset 0 0 0 1px var(--garis); }
+      .legenda-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12.5px; margin: 12px 0 4px; }
+      .legenda-strip i { display: inline-block; margin: 0 2px 0 10px; } .legenda-strip i:first-child { margin-left: 0; }
+      .legenda-strip i.libur { margin-top: 0; }
+      td small.dari { color: var(--redup); font-weight: 400; }
+      /* karyawan */
+      table.karyawan th.pin { width: 3.5em; }
+      table.karyawan td.pin { color: var(--redup); }
+      .di-mesin { display: block; font-size: 12px; color: var(--redup); padding: 0 10px; }
+      /* jam kerja: kartu jadwal berdampingan */
+      .jadwal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin: 0 0 12px; }
+      .jadwal-kartu > header { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; min-height: 32px; }
+      .jadwal-kartu > header h3 { margin: 0; }
+      .jadwal-kartu > header p { margin: 0; font-size: 12.5px; color: var(--redup); }
+      .jadwal-kartu > header input { font-weight: 650; font-size: 14px; padding-left: 6px; margin-left: -7px; }
+      .hari-kerja { display: grid; grid-template-columns: 4.4em 38px 1fr; align-items: center; gap: 6px; min-height: 40px; border-top: 1px solid var(--garis); }
+      .hari-kerja .rentang { display: flex; align-items: center; gap: 6px; }
+      .hari-kerja input[type="time"] { width: 86px; padding: 0 6px; }
+      .hari-kerja .libur-teks { color: var(--redup); font-size: 13px; }
+      .hari-kerja.off .rentang, .hari-kerja:not(.off) .libur-teks { display: none; }
+      .hari-kerja.off .nama-hari { color: var(--redup); }
+      .aturan { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px 28px; margin: 0 0 14px; }
+      .aturan .centang { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+      .aturan .satuan { font-weight: 400; }
+      /* hari libur: ubin tanggal */
+      .tambah { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+      .tambah #p-libur-ket { flex: 1; min-width: 180px; }
+      .libur-list { list-style: none; margin: 0; padding: 0; }
+      .libur-list li { display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--garis); }
+      .libur-list li button { margin-left: auto; }
+      .tgl { width: 46px; flex: none; text-align: center; border: 1px solid var(--garis); border-radius: 8px; padding: 3px 0 4px; line-height: 1.15; }
+      .tgl b { display: block; font-size: 19px; }
+      .tgl span { font-size: 11.5px; color: var(--redup); }
+      .libur-list.lewat { opacity: 0.7; }
+      /* backup */
+      .status-backup { border-left: 4px solid var(--hijau); padding: 4px 0 4px 14px; }
+      .status-backup b { display: block; font-size: 17px; }
+      .status-backup span { color: var(--redup); font-size: 13px; }
+      .status-backup.off { border-left-color: var(--merah); } .status-backup.off b { color: var(--merah); }
+      .folder { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; }
+      .folder code { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+      @media (prefers-reduced-motion: reduce) { input.saklar, input.saklar::before { transition: none; } }
 
       /* --- pesan (toast) ---------------------------------------------------------------------- */
       #pesan {
@@ -140,7 +453,7 @@
       /* --- kunci (login) ---------------------------------------------------------------------- */
       .kunci { display: none; }
       .terkunci .kunci { display: grid; place-items: center; position: fixed; inset: 0; background: var(--kertas); z-index: 10; padding: 24px; }
-      .terkunci .aplikasi, .terkunci #pesan { display: none; }
+      .terkunci .aplikasi, .terkunci #pesan, .terkunci .laci { display: none; }
       .kunci form { width: min(340px, 100%); display: flex; flex-direction: column; gap: 12px; }
       .kunci img { width: 52px; height: 52px; border-radius: 12px; }
       .kunci h1 { margin-top: 6px; }
@@ -157,7 +470,7 @@
         .kaki { margin: 0 0 0 auto; padding: 0; display: flex; gap: 10px; align-items: center; } .kaki p { margin: 0; }
         main > section { padding: 20px 16px 40px; }
       }
-      @media (prefers-reduced-motion: reduce) { tr.baru { animation: none; } }
+      @media (prefers-reduced-motion: reduce) { tr.baru, .kartu.baru { animation: none; } }
 
       .print-title { display: none; }
       @media print {
@@ -169,6 +482,8 @@
         .print-title { display: block; font-size: 14px; font-weight: 600; margin: 0 0 6px; }
         table { font-size: 10px; } th, td { padding: 3px 4px; } tr { break-inside: avoid; }
         thead th { position: static; }
+        .matriks-bungkus { max-height: none; overflow: visible; border: 0; } .matriks th:first-child { position: static; }
+        .matriks td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       }
     </style>
   </head>
@@ -195,120 +510,129 @@
         </div>
         <nav aria-label="Menu">
           <p class="kelompok">Absensi</p>
-          <button id="tab-hari-ini" aria-controls="hari-ini">Hari ini</button>
-          <button id="tab-riwayat" aria-controls="riwayat">Riwayat</button>
-          <button id="tab-rekap" aria-controls="rekap">Rekap</button>
-          <button id="tab-izin" aria-controls="izin">Izin &amp; koreksi</button>
+          <button id="tab-hari-ini" aria-controls="hari-ini"><i data-lucide="calendar-check"></i>Hari ini</button>
+          <button id="tab-riwayat" aria-controls="riwayat"><i data-lucide="history"></i>Riwayat</button>
+          <button id="tab-rekap" aria-controls="rekap"><i data-lucide="sheet"></i>Rekap</button>
+          <button id="tab-izin" aria-controls="izin"><i data-lucide="file-pen-line"></i>Izin &amp; koreksi</button>
           <p class="kelompok">Kelola</p>
-          <button id="tab-karyawan" aria-controls="karyawan">Karyawan</button>
-          <button id="tab-mesin" aria-controls="mesin">Mesin</button>
-          <button id="tab-pengaturan" aria-controls="pengaturan">Pengaturan</button>
+          <button id="tab-karyawan" aria-controls="karyawan"><i data-lucide="users"></i>Karyawan</button>
+          <button id="tab-jam-kerja" aria-controls="jam-kerja"><i data-lucide="clock"></i>Jam kerja</button>
+          <button id="tab-libur" aria-controls="libur"><i data-lucide="calendar-x"></i>Hari libur</button>
+          <button id="tab-mesin" aria-controls="mesin"><i data-lucide="fingerprint-pattern"></i>Mesin</button>
+          <p class="kelompok">Sistem</p>
+          <button id="tab-backup" aria-controls="backup"><i data-lucide="database-backup"></i>Backup</button>
+          <button id="tab-pengaturan" aria-controls="pengaturan"><i data-lucide="settings"></i>Pengaturan</button>
         </nav>
         <div class="kaki">
           <p id="status-samping" class="redup">Menghubungkan…</p>
-          <button id="tombol-kunci">Kunci aplikasi</button>
+          <button id="tombol-kunci"><i data-lucide="lock"></i>Kunci aplikasi</button>
         </div>
       </aside>
 
       <main>
         <section id="hari-ini" aria-labelledby="judul-hari-ini">
           <header class="kepala"><h1 id="judul-hari-ini">Hari ini</h1><p id="tanggal"></p></header>
-          <p id="status-mesin" class="muted">Menghubungkan…</p>
-          <p id="peringatan" class="off" hidden></p>
-          <p id="ringkasan" class="ringkasan"></p>
-          <div id="pita" class="pita" aria-hidden="true" hidden></div>
-          <p id="pita-legenda" class="legenda redup" aria-hidden="true" hidden><i></i>scan pertama<i class="telat"></i>terlambat<i class="lagi"></i>scan berikutnya</p>
-          <div id="nama-hari-ini"></div>
-          <h2>Semua scan hari ini <span id="jumlah" class="redup"></span></h2>
-          <table>
-            <thead><tr><th>Jam</th><th>Nama</th><th>PIN</th><th>Tombol mesin</th><th>Verifikasi</th></tr></thead>
-            <tbody id="daftar"></tbody>
-          </table>
-          <p id="isian" class="muted" style="margin-top: 20px; font-size: 13px"></p>
+          <p id="status-mesin" class="catatan off" hidden></p>
+          <p id="peringatan" class="catatan off" hidden></p>
+          <div class="judul-baris">
+            <h2>Sebaran jam scan</h2>
+            <p id="pita-legenda" class="legenda redup" aria-hidden="true" hidden><i></i>scan pertama<i class="telat"></i>terlambat<i class="lagi"></i>scan berikutnya</p>
+            <p id="pita-kosong" class="legenda redup" hidden>Belum ada scan. Titik muncul di sini begitu karyawan scan.</p>
+          </div>
+          <!-- titik = satu scan; arahkan kursor untuk nama. Isinya sama dengan tabel di bawah, jadi disembunyikan dari pembaca layar -->
+          <div id="pita" class="pita" aria-hidden="true"></div>
+          <div class="judul-baris">
+            <p id="ringkasan" class="ringkasan" hidden></p>
+            <input type="search" id="papan-cari" placeholder="Cari nama atau PIN" aria-label="Cari karyawan hari ini" hidden />
+          </div>
+          <div id="saring" class="saring" role="group" aria-label="Tampilkan karyawan"></div>
+          <div id="papan" class="papan" aria-live="polite"></div>
+          <nav id="papan-hal" class="halaman" aria-label="Halaman kartu karyawan" hidden></nav>
+          <details class="lipat">
+            <summary>Semua scan hari ini <span id="jumlah" class="redup"></span></summary>
+            <div class="controls"><input type="search" id="daftar-cari" placeholder="Cari nama atau PIN" aria-label="Cari scan hari ini" /></div>
+            <table>
+              <thead><tr><th>Jam</th><th>Nama</th><th>PIN</th><th>Tombol mesin</th><th>Verifikasi</th></tr></thead>
+              <tbody id="daftar"></tbody>
+            </table>
+            <nav id="daftar-hal" class="halaman" aria-label="Halaman scan hari ini" hidden></nav>
+          </details>
+          <p id="isian" class="muted kecil" style="margin-top: 20px" hidden></p>
         </section>
 
         <section id="riwayat" aria-labelledby="judul-riwayat" hidden>
-          <header class="kepala"><h1 id="judul-riwayat">Riwayat absen</h1><p>Semua scan dari mesin dan koreksi manual</p></header>
+          <header class="kepala">
+            <h1 id="judul-riwayat">Riwayat absen</h1><p>Dari scan mesin, izin, dan koreksi manual</p>
+            <div class="aksi"><span class="grup" role="group" aria-label="Simpan atau cetak"><button id="r-xlsx"><i data-lucide="file-spreadsheet"></i>Excel</button><button id="r-csv"><i data-lucide="file-text"></i>CSV</button><button id="r-cetak"><i data-lucide="printer"></i>Cetak</button></span></div>
+          </header>
           <div class="controls">
-            <select id="r-rentang" aria-label="Rentang">
-              <option value="today">Hari ini</option>
-              <option value="yesterday">Kemarin</option>
-              <option value="week">Minggu ini</option>
-              <option value="month" selected>Bulan ini</option>
-              <option value="lastMonth">Bulan lalu</option>
-              <option value="custom">Pilih tanggal</option>
-            </select>
-            <input type="date" id="r-dari" aria-label="Dari tanggal" /> –
-            <input type="date" id="r-sampai" aria-label="Sampai tanggal" />
+            <input type="date" id="r-dari" data-sampai="r-sampai" aria-label="Rentang tanggal" />
+            <input type="date" id="r-sampai" />
             <input type="search" id="r-cari" placeholder="Cari nama atau PIN" aria-label="Cari nama atau PIN" />
+            <span class="grup pilih-tampilan" id="r-tampilan" role="group" aria-label="Tampilan"><button data-v="hari" aria-pressed="true">Per hari</button><button data-v="scan" aria-pressed="false">Semua scan</button></span>
             <select id="r-mesin" aria-label="Mesin" hidden></select>
-            <span class="spacer"></span>
-            <button id="r-xlsx">Excel</button><button id="r-csv">CSV</button><button id="r-cetak">Cetak</button>
           </div>
           <p class="print-title" id="r-judul"></p>
-          <p id="r-info" class="muted"></p>
-          <table>
-            <thead><tr><th>Tanggal</th><th>Jam</th><th>Nama</th><th>PIN</th><th>Tombol mesin</th><th>Verifikasi</th><th>Mesin</th><th>Keterangan</th></tr></thead>
-            <tbody id="r-daftar"></tbody>
-          </table>
+          <div id="r-hari">
+            <p class="legenda-sel redup no-print"><i class="telat"></i>terlambat (+menit)<i class="izin"></i>izin, sakit, cuti, dinas<i class="alpa"></i>tidak masuk
+              <i class="libur"></i>libur<span><b>?</b> tanpa absen pulang</span><span><u>10:00</u> koreksi manual</span></p>
+            <div class="matriks-bungkus"><table class="matriks"><thead id="r-kepala"></thead><tbody id="r-baris"></tbody></table></div>
+          </div>
+          <div id="r-scan" hidden>
+            <p id="r-info" class="meta"></p>
+            <table class="log">
+              <thead><tr><th class="jam">Jam</th><th>Nama</th><th>Tombol mesin</th><th>Verifikasi</th><th class="mesin">Mesin</th></tr></thead>
+              <tbody id="r-daftar"></tbody>
+            </table>
+          </div>
         </section>
 
         <section id="rekap" aria-labelledby="judul-rekap" hidden>
-          <header class="kepala"><h1 id="judul-rekap">Rekap</h1><p>Per karyawan per bulan, dihitung dari scan, izin, dan koreksi</p></header>
+          <header class="kepala">
+            <h1 id="judul-rekap">Rekap</h1><p>Per karyawan, dari scan, izin, dan koreksi</p>
+            <div class="aksi"><span class="grup" role="group" aria-label="Simpan atau cetak"><button id="k-xlsx"><i data-lucide="file-spreadsheet"></i>Excel</button><button id="k-csv"><i data-lucide="file-text"></i>CSV</button><button id="k-cetak"><i data-lucide="printer"></i>Cetak</button></span></div>
+          </header>
           <div class="controls">
             <select id="k-bulan" aria-label="Bulan"></select>
-            <input type="date" id="k-dari" aria-label="Dari tanggal" /> –
-            <input type="date" id="k-sampai" aria-label="Sampai tanggal" />
-            <span class="spacer"></span>
-            <button id="k-xlsx">Excel</button><button id="k-csv">CSV</button><button id="k-cetak">Cetak</button>
+            <input type="date" id="k-dari" data-sampai="k-sampai" aria-label="Rentang tanggal" />
+            <input type="date" id="k-sampai" />
           </div>
           <p class="print-title" id="k-judul"></p>
-          <p id="k-info" class="muted no-print"></p>
+          <div id="k-info" class="keterangan no-print"></div>
           <div id="k-ringkasan">
             <table>
-              <thead><tr><th>Nama</th><th class="dept">Departemen</th><th class="num">Hari kerja</th><th class="num">Hadir</th><th class="num">Terlambat</th>
+              <thead><tr><th>Karyawan</th><th class="num">Hadir</th><th class="num">Terlambat</th>
                 <th class="num">Pulang cepat</th><th class="num">Lupa pulang</th><th class="num">Alpa</th><th class="num">Izin</th>
                 <th class="num">Jam kerja</th><th class="num lembur">Lembur</th></tr></thead>
               <tbody id="k-daftar"></tbody>
             </table>
-            <p class="muted no-print" style="margin-top: 12px">Klik nama untuk rincian per hari. Jam kerja dan lembur dalam jam:menit.</p>
+            <p class="legenda-strip muted no-print"><i class="hadir"></i>hadir <i class="telat"></i>terlambat <i class="alpa"></i>alpa <i class="izin"></i>izin, sakit, cuti <i class="libur"></i>libur</p>
+            <p class="muted kecil no-print">Klik nama untuk rincian per hari. Terlambat dan pulang cepat: berapa kali, dengan total jam:menit di bawahnya.</p>
           </div>
           <div id="k-rincian" hidden>
-            <p class="controls"><button id="k-kembali">← Semua karyawan</button></p>
-            <h2 id="k-nama"></h2>
+            <div class="rincian-kepala no-print"><button id="k-kembali">← Semua karyawan</button><h2 id="k-nama"></h2></div>
+            <p id="k-hari-info" class="meta no-print"></p>
             <table>
               <thead><tr><th>Tanggal</th><th>Masuk</th><th>Pulang</th><th>Status</th><th class="num">Terlambat (mnt)</th>
-                <th class="num">Pulang cepat (mnt)</th><th class="num">Jam kerja</th><th class="num lembur">Lembur</th><th>Keterangan</th></tr></thead>
+                <th class="num">Pulang cepat (mnt)</th><th class="num">Jam kerja</th><th class="num lembur">Lembur</th><th>Keterangan</th><th class="no-print"><span class="sr-only">Tindakan</span></th></tr></thead>
               <tbody id="k-hari"></tbody>
             </table>
           </div>
         </section>
 
         <section id="izin" aria-labelledby="judul-izin" hidden>
-          <header class="kepala"><h1 id="judul-izin">Izin &amp; koreksi</h1><p>Disimpan di aplikasi ini saja; log absen di mesin tidak pernah diubah</p></header>
+          <header class="kepala">
+            <h1 id="judul-izin">Izin &amp; koreksi</h1><p>Disimpan di aplikasi ini saja; log absen di mesin tidak pernah diubah</p>
+            <div class="aksi"><button id="i-baru-izin" class="utama">Catat izin</button><button id="i-baru-koreksi">Koreksi absen</button></div>
+          </header>
           <h2>Izin, sakit, cuti, dinas luar</h2>
           <p class="muted">Hari kerja dengan catatan ini tidak dihitung alpa, walau ada scan.</p>
-          <form id="i-izin" class="controls">
-            <select name="pin" aria-label="Karyawan" required></select>
-            <select name="kind" aria-label="Jenis"></select>
-            <input type="date" name="from" aria-label="Dari tanggal" required /> –
-            <input type="date" name="to" aria-label="Sampai tanggal (kosong = satu hari)" title="Kosong = satu hari" />
-            <input name="note" placeholder="Keterangan" aria-label="Keterangan" size="28" />
-            <button name="simpan" class="utama">Simpan</button> <button type="button" name="batal" hidden>Batal</button>
-          </form>
           <table>
             <thead><tr><th>Tanggal</th><th>Nama</th><th>Jenis</th><th>Keterangan</th><th></th></tr></thead>
             <tbody id="i-izin-daftar"></tbody>
           </table>
           <h2>Koreksi absen</h2>
           <p class="muted">Untuk karyawan yang lupa scan. Koreksi dihitung di Rekap seperti scan biasa, dan tampil bertanda "manual" di Riwayat.</p>
-          <form id="i-koreksi" class="controls">
-            <select name="pin" aria-label="Karyawan" required></select>
-            <input type="date" name="date" aria-label="Tanggal" required />
-            <input type="time" name="time" aria-label="Jam" required />
-            <input name="reason" placeholder="Alasan (wajib), mis. lupa absen pulang" aria-label="Alasan" size="34" required />
-            <button name="simpan" class="utama">Simpan</button> <button type="button" name="batal" hidden>Batal</button>
-          </form>
           <table>
             <thead><tr><th>Tanggal</th><th>Jam</th><th>Nama</th><th>Alasan</th><th></th></tr></thead>
             <tbody id="i-koreksi-daftar"></tbody>
@@ -316,65 +640,127 @@
         </section>
 
         <section id="karyawan" aria-labelledby="judul-karyawan" hidden>
-          <header class="kepala"><h1 id="judul-karyawan">Karyawan</h1><p id="y-info"></p></header>
-          <div class="controls">
-            <button id="y-ambil" class="utama">Ambil data karyawan dari mesin</button>
-            <span id="y-status" class="muted" role="status"></span>
+          <header class="kepala">
+            <h1 id="judul-karyawan">Karyawan</h1><p id="y-info"></p>
+            <div class="aksi"><input type="search" id="y-cari" placeholder="Cari nama atau PIN" aria-label="Cari karyawan" /><button id="y-ambil"><i data-lucide="download"></i>Ambil data dari mesin</button></div>
+          </header>
+          <p id="y-status" class="catatan info" role="status" hidden></p>
+          <div class="keterangan">
+            <p><i data-lucide="pen-line"></i><span>Nama lengkap dan departemen yang diisi di sini dipakai di semua layar dan laporan. Tersimpan otomatis.</span></p>
+            <p><i data-lucide="fingerprint-pattern"></i><span>Mesin hanya menyimpan nama sampai <b>15 karakter</b>, jadi tulis nama lengkapnya di sini.</span></p>
+            <p><i data-lucide="user-plus"></i><span>Karyawan baru yang didaftarkan di mesin muncul di daftar ini dengan sendirinya.</span></p>
           </div>
-          <p class="muted">Nama di mesin maksimal 15 karakter. Nama lengkap dan departemen di sini dipakai di semua layar dan laporan.
-            Karyawan baru yang didaftarkan di mesin muncul sendiri.</p>
-          <table>
-            <thead><tr><th>PIN</th><th>Nama di mesin</th><th>Nama lengkap</th><th>Departemen</th><th>Jadwal</th><th>Ikut rekap</th></tr></thead>
+          <table class="karyawan">
+            <thead><tr><th class="pin">PIN</th><th>Nama</th><th style="width: 24%">Departemen</th><th style="width: 18%">Jadwal</th><th class="tengah">Ikut rekap</th></tr></thead>
             <tbody id="y-daftar"></tbody>
           </table>
         </section>
 
         <section id="mesin" aria-labelledby="judul-mesin" hidden>
-          <header class="kepala"><h1 id="judul-mesin">Mesin</h1><p>Perintah diambil mesin ±20 detik sampai 2 menit setelah tombol ditekan</p></header>
-          <p class="muted">Server di aplikasi ini menyetel jam mesin otomatis bila selisihnya lebih dari 2 menit.</p>
+          <header class="kepala"><h1 id="judul-mesin">Mesin</h1><p>Jam mesin disetel otomatis bila selisihnya lebih dari 2 menit</p></header>
           <div id="m-daftar"></div>
           <h2>Cari mesin di jaringan</h2>
-          <p><button id="m-cari">Cari mesin</button> <span class="muted">Mencari mesin di jaringan kantor lewat port 5005, beserta petunjuk isian menunya.</span></p>
+          <p class="muted">Mencari mesin di jaringan kantor lewat port 5005, beserta petunjuk isian menunya.</p>
+          <p><button id="m-cari">Cari mesin</button></p>
           <div id="m-hasil"></div>
         </section>
 
+        <section id="jam-kerja" aria-labelledby="judul-jam-kerja" class="form" hidden>
+          <header class="kepala"><h1 id="judul-jam-kerja">Jam kerja</h1><p>Tersimpan otomatis dan langsung dipakai rekap</p></header>
+          <h2 class="sub">Jadwal</h2>
+          <p class="muted kecil">Jadwal utama berlaku untuk semua karyawan, kecuali yang dipilihkan jadwal lain di menu Karyawan.</p>
+          <div id="p-jadwal" class="jadwal-grid"></div>
+          <p><button id="p-jadwal-tambah"><i data-lucide="plus"></i>Tambah jadwal lain</button> <span class="muted kecil">Mis. paruh waktu atau shift.</span></p>
+          <h2 class="sub">Aturan rekap</h2>
+          <p class="muted kecil">Berlaku untuk semua jadwal.</p>
+          <div class="panel aturan">
+            <label class="bidang">Toleransi terlambat <span class="satuan"><input type="number" id="p-toleransi" min="0" max="600" /> menit</span>
+              <small>Menit terlambat tetap dihitung dari jam masuk. Contoh: masuk 08:00, toleransi 15, scan 08:20 = terlambat 20 menit.</small></label>
+            <label class="bidang">Scan kedua dihitung pulang bila minimal <span class="satuan"><input type="number" id="p-jarak" min="0" max="600" /> menit setelah masuk</span>
+              <small>Scan yang lebih dekat dianggap scan ganda.</small></label>
+            <div class="bidang">
+              <label class="centang"><input type="checkbox" class="saklar" id="p-lembur-aktif" /> Hitung lembur</label>
+              <label class="satuan">mulai <input type="number" id="p-lembur" min="0" max="600" aria-label="Lembur dihitung mulai menit" /> menit setelah jam pulang</label>
+              <small>Lembur di bawah batas ini dihitung 0.</small>
+            </div>
+          </div>
+          <p><button id="p-jadwal-awal" class="mini">Kembalikan jam kerja dan aturan ke nilai awal</button></p>
+        </section>
+
+        <section id="libur" aria-labelledby="judul-libur" class="form" hidden>
+          <header class="kepala"><h1 id="judul-libur">Hari libur</h1><p>Tidak dihitung alpa. Libur nasional belum terisi otomatis</p></header>
+          <div class="sempit">
+            <p class="controls panel tambah">
+              <input type="date" id="p-libur-tanggal" aria-label="Tanggal libur" />
+              <input id="p-libur-ket" placeholder="Keterangan, mis. Tahun Baru" aria-label="Keterangan libur" />
+              <button id="p-libur-tambah" class="utama"><i data-lucide="plus"></i>Tambah</button>
+            </p>
+            <div id="p-libur"></div>
+          </div>
+        </section>
+
+        <section id="backup" aria-labelledby="judul-backup" class="form" hidden>
+          <header class="kepala"><h1 id="judul-backup">Backup</h1><p>Salinan data absen, karyawan, dan pengaturan</p></header>
+          <div class="sempit isi">
+            <div id="p-backup-status" class="status-backup"><b id="p-backup-info"></b><span id="p-backup-sub"></span></div>
+            <p><button id="p-backup" class="utama">Backup sekarang</button> <button id="p-pulihkan">Pulihkan dari backup…</button></p>
+            <div class="panel folder"><span class="redup">Disimpan di</span><code id="p-folder"></code><button id="p-folder-ganti" class="mini">Ganti folder</button></div>
+            <p class="muted kecil">Otomatis sekali sehari saat aplikasi pertama kali hidup; 30 backup terakhir disimpan. Backup berisi data sidik jari
+              dan wajah karyawan: simpan di tempat yang aman dan jangan dibagikan.</p>
+          </div>
+        </section>
+
         <section id="pengaturan" aria-labelledby="judul-pengaturan" class="form" hidden>
-          <header class="kepala"><h1 id="judul-pengaturan">Pengaturan</h1><p>Tersimpan otomatis dan langsung dipakai rekap</p></header>
-          <h2>Kantor</h2>
-          <p><label>Nama kantor (judul laporan) <input id="p-kantor" size="36" /></label></p>
-          <h2>Kata sandi</h2>
-          <form id="p-sandi" class="controls">
-            <input type="password" name="lama" placeholder="Kata sandi sekarang" aria-label="Kata sandi sekarang" autocomplete="current-password" required />
-            <input type="password" name="baru" placeholder="Kata sandi baru" aria-label="Kata sandi baru" autocomplete="new-password" required />
-            <input type="password" name="ulang" placeholder="Ulangi kata sandi baru" aria-label="Ulangi kata sandi baru" autocomplete="new-password" required />
-            <button>Ganti kata sandi</button>
-          </form>
-          <h2>Jam kerja</h2>
-          <div id="p-jadwal"></div>
-          <p><button id="p-jadwal-tambah">Tambah jadwal lain</button>
-            <span class="muted">Untuk karyawan dengan jam berbeda, misalnya paruh waktu. Jadwal tiap karyawan dipilih di tab Karyawan.</span></p>
-          <p><label>Toleransi terlambat <input type="number" id="p-toleransi" min="0" max="600" /> menit</label></p>
-          <p><label><input type="checkbox" id="p-lembur-aktif" /> Hitung lembur</label>,
-            <label>mulai minimal <input type="number" id="p-lembur" min="0" max="600" /> menit setelah jam pulang</label></p>
-          <p><label>Scan kedua dihitung pulang bila minimal <input type="number" id="p-jarak" min="0" max="600" /> menit setelah masuk</label></p>
-          <p class="muted">Menit terlambat dihitung dari jam masuk. Contoh: masuk 08:00, toleransi 15, scan 08:20 = terlambat 20 menit.
-            <button id="p-jadwal-awal">Kembalikan ke nilai awal</button></p>
-          <h2>Hari libur</h2>
-          <p class="controls">
-            <input type="date" id="p-libur-tanggal" aria-label="Tanggal libur" />
-            <input id="p-libur-ket" placeholder="Keterangan, mis. Tahun Baru" aria-label="Keterangan libur" size="30" />
-            <button id="p-libur-tambah">Tambah</button>
-          </p>
-          <table style="width: auto"><tbody id="p-libur"></tbody></table>
-          <h2>Backup</h2>
-          <p class="off">Backup berisi data sidik jari dan wajah karyawan. Simpan di tempat yang aman, jangan dibagikan.</p>
-          <p>Folder <code id="p-folder"></code> <button id="p-folder-ganti">Ganti folder</button></p>
-          <p id="p-backup-info"></p>
-          <p class="muted">Backup otomatis sekali sehari saat aplikasi pertama kali hidup; 30 backup terakhir disimpan.</p>
-          <p><button id="p-backup" class="utama">Backup sekarang</button> <button id="p-pulihkan">Pulihkan dari backup…</button></p>
+          <header class="kepala"><h1 id="judul-pengaturan">Pengaturan</h1><p>Tersimpan otomatis</p></header>
+          <div class="blok">
+            <header><h2>Kantor</h2><p>Nama ini tampil di layar kunci dan judul laporan.</p></header>
+            <div class="isi"><label class="bidang">Nama kantor <input id="p-kantor" placeholder="Mis. PT Maju Jaya, Cabang Bekasi" /></label></div>
+          </div>
+          <div class="blok">
+            <header><h2>Kata sandi</h2><p>Diminta setiap aplikasi dibuka dan setelah jendela tersembunyi lebih dari 5 menit.</p></header>
+            <div class="isi"><p><button id="p-sandi-buka">Ganti kata sandi</button></p></div>
+          </div>
+          <div class="blok">
+            <header><h2>Alamat untuk mesin</h2><p>Isi di menu Jaringan mesin absensi. IP komputer ini sebaiknya direservasi di router.</p></header>
+            <div class="isi"><dl class="info-mesin"><dt>Mode</dt><dd>Internet</dd><dt>Server IP</dt><dd id="p-ip"></dd><dt>Server Port</dt><dd id="p-port"></dd><dt>Server Req</dt><dd>Ya</dd></dl></div>
+          </div>
         </section>
       </main>
     </div>
+    <dialog id="laci" class="laci" aria-labelledby="laci-judul">
+      <header class="laci-kepala">
+        <div><h2 id="laci-judul"></h2><p id="laci-sub" hidden></p></div>
+        <button type="button" id="laci-tutup" aria-label="Tutup panel">&times;</button>
+      </header>
+      <div id="laci-orang" class="laci-isi" hidden></div>
+      <form id="i-izin" class="laci-isi" hidden>
+        <label class="bidang">Karyawan <select name="pin" required></select></label>
+        <fieldset class="bidang"><legend>Jenis</legend><div class="pilihan" id="i-jenis"></div></fieldset>
+        <div class="baris">
+          <label class="bidang">Dari tanggal <input type="date" name="from" required /></label>
+          <label class="bidang">Sampai tanggal <input type="date" name="to" /><small>Kosongkan untuk satu hari</small></label>
+        </div>
+        <label class="bidang">Keterangan <input name="note" placeholder="Mis. surat dokter, acara keluarga" /></label>
+        <p class="muted kecil">Hari kerja dengan catatan ini tidak dihitung alpa, walau ada scan.</p>
+        <div class="laci-kaki"><button type="button" name="batal">Batal</button><button name="simpan" class="utama">Simpan</button></div>
+      </form>
+      <form id="p-sandi" class="laci-isi" hidden>
+        <label class="bidang">Kata sandi sekarang <input type="password" name="lama" autocomplete="current-password" required /></label>
+        <label class="bidang">Kata sandi baru <input type="password" name="baru" autocomplete="new-password" required /></label>
+        <label class="bidang">Ulangi kata sandi baru <input type="password" name="ulang" autocomplete="new-password" required /></label>
+        <div class="laci-kaki"><button type="button" name="batal">Batal</button><button class="utama">Ganti kata sandi</button></div>
+      </form>
+      <form id="i-koreksi" class="laci-isi" hidden>
+        <label class="bidang">Karyawan <select name="pin" required></select></label>
+        <div class="baris">
+          <label class="bidang">Tanggal <input type="date" name="date" required /></label>
+          <label class="bidang">Jam <input type="time" name="time" required /></label>
+        </div>
+        <label class="bidang">Alasan <input name="reason" required placeholder="Mis. lupa absen pulang" /></label>
+        <p class="muted kecil">Dihitung di Rekap seperti scan biasa, dan tampil bertanda "manual" di Riwayat. Log di mesin tidak diubah.</p>
+        <div class="laci-kaki"><button type="button" name="batal">Batal</button><button name="simpan" class="utama">Simpan</button></div>
+      </form>
+    </dialog>
     <p id="pesan" role="status" hidden></p>
     <script type="module" src="/src/main.js"></script>
   </body>

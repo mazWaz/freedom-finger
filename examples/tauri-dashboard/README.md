@@ -10,13 +10,16 @@ rekap bulanan, izin dan koreksi absen, perawatan mesin, export Excel, backup) da
 
 | Tab | Isi |
 |---|---|
-| Hari ini | Siapa yang sudah absen, terlambat, izin, atau belum absen; pita jam masuk; absen hari ini secara realtime; isian menu mesin |
-| Riwayat | Semua scan per rentang tanggal, termasuk koreksi manual (bertanda "Manual" dengan alasannya); cari nama atau PIN; pilih mesin; export Excel/CSV dan cetak |
-| Rekap | Per karyawan per bulan: hadir, terlambat, pulang cepat, lupa absen pulang, alpa, izin/sakit/cuti/dinas, jam kerja, lembur; klik untuk rincian per hari |
-| Izin & koreksi | Izin, sakit, cuti, dinas luar (satu hari atau rentang, dengan keterangan); koreksi absen untuk yang lupa scan (jam dan alasan wajib). Bisa diubah dan dihapus |
+| Hari ini | Sebaran jam scan (arahkan kursor ke titik untuk nama; garis jam masuk/pulang semua jadwal). Papan absen: satu kartu per karyawan (tepat waktu, terlambat, izin, belum datang), bisa disaring per status, dicari, dan dibagi per halaman. Kartu dibuka untuk mencatat izin atau koreksi absen dengan nama dan tanggal sudah terisi. Semua scan hari ini secara realtime (terlipat, dengan cari dan halaman); isian menu mesin |
+| Riwayat | Per hari: daftar hadir, karyawan ke bawah dan tanggal ke samping, sel berwarna menurut hitungan Rekap (terlambat, izin/sakit/cuti/dinas, tidak masuk, libur, tanpa absen pulang, koreksi manual). Semua scan: tiap scan per hari, termasuk koreksi manual; pilih mesin. Keduanya: rentang tanggal dengan pilihan cepat (1 minggu, 1–6 bulan, …), cari nama atau PIN, export Excel/CSV dan cetak |
+| Rekap | Per karyawan per bulan: strip harian (hadir, terlambat, alpa, izin, libur), hadir, terlambat, pulang cepat, lupa absen pulang, alpa, izin/sakit/cuti/dinas, jam kerja, lembur; klik untuk rincian per hari |
+| Izin & koreksi | Izin, sakit, cuti, dinas luar (satu hari atau rentang, dengan keterangan); koreksi absen untuk yang lupa scan (jam dan alasan wajib). Form di panel samping, juga dari kartu di Hari ini. Bisa diubah dan dihapus |
 | Karyawan | Ambil data karyawan dari mesin; nama lengkap, departemen, jadwal, dan ikut rekap |
 | Mesin | Per mesin: Cloud ID, IP, terakhir aktif, jam mesin dibanding jam PC, firmware; setel jam, tarik ulang semua log, restart (perintah yang menunggu mesin tetap tampil setelah aplikasi dibuka ulang); cari mesin di jaringan |
-| Pengaturan | Nama kantor, jam kerja per hari (jadwal utama dan jadwal lain, mis. paruh waktu), toleransi, batas lembur, hari libur, backup dan pulihkan |
+| Jam kerja | Jam kerja per hari (jadwal utama dan jadwal lain, mis. paruh waktu), toleransi terlambat, lembur, jarak scan pulang |
+| Hari libur | Tanggal libur kantor dan keterangannya |
+| Backup | Folder backup, backup sekarang, pulihkan dari backup |
+| Pengaturan | Nama kantor dan kata sandi |
 
 Aturan rekap: scan pertama = masuk, scan terakhir = pulang bila minimal 60 menit sesudahnya
 (tombol Masuk/Pulang di mesin diabaikan); menit terlambat dihitung dari jam masuk; hari ini
@@ -33,7 +36,7 @@ Aplikasi dirancang untuk PC yang hanya menyala di jam kantor, bukan server 24 ja
 | Tutup jendela | Jendela disembunyikan ke tray; server tetap menerima absen. Keluar lewat menu tray |
 | Dibuka dua kali | Jendela yang sudah ada dimunculkan; tidak ada server kedua |
 | Absen selama PC mati | Mesin menyimpannya. Saat aplikasi start, `sync_attlog` menarik semua log dalam ±2 menit |
-| Isian menu mesin | Ditampilkan di bawah daftar absen, dengan IP PC ini dan port |
+| Isian menu mesin | Ditampilkan di bawah daftar absen selama ada mesin yang belum/tidak terhubung, dengan IP PC ini dan port |
 | IP PC berubah | Peringatan bila mesin tidak lagi terhubung dan IP berbeda dari saat terakhir terhubung |
 | Firewall Windows | Installer (NSIS, butuh admin) membuka TCP 8013 untuk jaringan lokal; uninstall menutupnya |
 | Backup | Otomatis sekali sehari saat aplikasi pertama kali hidup, ke folder `Freedom Finger Backup` di folder pengguna (bukan Dokumen, yang sering disinkronkan OneDrive); 30 terakhir disimpan |
@@ -73,9 +76,10 @@ mendaftarkan autostart. Installer dibuat oleh `.github/workflows/release.yml` (j
 |---|---|
 | `src-tauri/src/main.rs` | Server tertanam, tray, autostart, satu instans; perintah untuk halaman: `aplikasi.json`, export .xlsx/CSV, backup, pulihkan, cetak |
 | `src/main.js` | Mulai: tunggu server, event realtime, `sync_attlog` saat start, backup otomatis, pindah tab |
-| `src/app.js` | Bersama: `fetch` ke API, `get_users` untuk nama, `aplikasi.json`, tanggal, export |
+| `src/app.js` | Bersama: `fetch` ke API, `get_users` untuk nama, `aplikasi.json`, tanggal dan rentang cepat, halaman (`paginate`), export |
+| `src/tanggal.js` | Pemilih tanggal dan rentang untuk semua `<input type="date">`: tampil "1 Januari 2026" dengan kalender berbahasa Indonesia, apa pun bahasa OS |
 | `src/kunci.js` | Layar kunci dan kata sandi (hash PBKDF2 lewat WebCrypto, disimpan di `aplikasi.json`) |
 | `src/hitung-rekap.js` | Aturan rekap, fungsi murni tanpa DOM; diuji `src/hitung-rekap.test.js` (`npm test`) |
-| `src/hari-ini.js`, `riwayat.js`, `rekap.js`, `izin.js`, `karyawan.js`, `mesin.js`, `pengaturan.js` | Satu modul per tab. `karyawan.js`: `get_all_pin` lalu `get_userinfo` per PIN baru, berlanjut walau aplikasi ditutup |
+| `src/hari-ini.js`, `riwayat.js`, `rekap.js`, `izin.js`, `karyawan.js`, `mesin.js`, `pengaturan.js` | Satu modul per tab; `pengaturan.js` melayani Jam kerja, Hari libur, Backup, dan Pengaturan. `karyawan.js`: `get_all_pin` lalu `get_userinfo` per PIN baru, berlanjut walau aplikasi ditutup |
 | `src-tauri/windows/hooks.nsh` | Aturan firewall saat install dan uninstall di Windows |
 | `simulasi.mjs` | Mesin tiruan untuk developer: satu absen FkWeb ke server |

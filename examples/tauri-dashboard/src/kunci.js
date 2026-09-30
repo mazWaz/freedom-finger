@@ -4,7 +4,7 @@
 // backup) tetap berjalan.
 // ponytail: hanya mengunci tampilan; orang yang bisa membuka folder data aplikasi tetap bisa membaca
 // datanya atau menghapus "auth" di aplikasi.json (itu juga jalan keluar bila lupa kata sandi).
-import { $, data, notify, saveData } from './app.js';
+import { $, closeDrawer, data, notify, saveData } from './app.js';
 
 const ITERATIONS = 310_000;
 const MIN_LENGTH = 6;
@@ -70,6 +70,7 @@ export function failed(text) {
 
 export function lock() {
   if (!data.auth) return;
+  closeDrawer(); // panel modal membuat layar kunci tidak bisa diketik
   document.body.classList.add('terkunci');
   $('kunci-form').reset();
   ready();
@@ -117,5 +118,6 @@ async function change(e) {
   data.auth = await makeAuth(f.baru.value);
   await saveData(null);
   $('p-sandi').reset();
+  closeDrawer();
   notify('Kata sandi sudah diganti.');
 }

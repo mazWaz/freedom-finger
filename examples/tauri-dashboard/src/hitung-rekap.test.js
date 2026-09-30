@@ -1,7 +1,7 @@
 // Uji aturan rekap (PRD Feature 7, Recap rules): npm test
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DEFAULT_SCHEDULE, correctionScans, recap } from './hitung-rekap.js';
+import { DEFAULT_SCHEDULE, addMonths, correctionScans, recap } from './hitung-rekap.js';
 
 // 2026-09-01 = Selasa
 const run = (scans, o = {}) =>
@@ -97,4 +97,12 @@ test('ringkasan satu minggu, karyawan tanpa scan tetap muncul', () => {
     hours: 540 + 520 + 630, overtime: 90, izin: 0, sakit: 0, cuti: 0, dinas: 0,
   });
   assert.deepEqual([b.pin, b.total.absent, b.total.present, b.days.length], ['2', 5, 0, 7]);
+});
+
+test('geser bulan: tanggal akhir bulan menyesuaikan, lintas tahun', () => {
+  assert.equal(addMonths('2026-09-30', -1), '2026-08-30');
+  assert.equal(addMonths('2026-03-31', -1), '2026-02-28');
+  assert.equal(addMonths('2024-03-31', -1), '2024-02-29');
+  assert.equal(addMonths('2026-01-15', -2), '2025-11-15');
+  assert.equal(addMonths('2026-12-01', 1), '2027-01-01');
 });

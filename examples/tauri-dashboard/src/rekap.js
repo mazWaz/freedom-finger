@@ -2,9 +2,15 @@
 // Hitungannya di hitung-rekap.js; tab ini hanya mengambil scan, menampilkan, dan meng-export.
 import {
   $, byPin, data, dayName, deptOf, dmy, duration, esc, exportCsv, exportXlsx, hhmm, inRecap, knownPins, lastMonths,
-  logs, monthName, monthRange, nameOf, period, print, reportTitle, scheduleName, scheduleOf, today, DAY_NAMES,
+  logs, longDate, monthName, monthRange, nameOf, print, reportTitle, scheduleName, scheduleOf, today,
 } from './app.js';
 import { LEAVE_KINDS, addDays, correctionScans, recap } from './hitung-rekap.js';
+import { openForm } from './izin.js';
+import { CalendarClock, Clock, createElement } from 'lucide';
+
+// ikon keterangan: jam = sama dengan menu Jam kerja, tempat aturannya diubah
+const ICON_COUNTED = createElement(CalendarClock).outerHTML;
+const ICON_RULES = createElement(Clock).outerHTML;
 
 export const LABEL = { hadir: 'Hadir', alpa: 'Alpa', libur: 'Libur', izin: 'Izin', sakit: 'Sakit', cuti: 'Cuti', dinas: 'Dinas luar' };
 
@@ -23,7 +29,7 @@ export function init() {
     setMonth();
     show('open');
   };
-  $('k-dari').onchange = $('k-sampai').onchange = () => {
+  $('k-dari').onchange = () => { // rentang (tanggal.js): sekali, di input dari
     $('k-bulan').value = 'custom';
     show('open');
   };
@@ -40,6 +46,14 @@ export function init() {
     detail = null;
     render();
   };
+  // hari alpa atau lupa pulang: koreksi/izin langsung dari rincian, nama dan tanggal sudah terisi
+  $('k-hari').onclick = (e) => {
+    const b = e.target.closest('button[data-aksi]');
+    if (!b) return;
+    if (b.dataset.aksi === 'koreksi') openForm('corrections', { pin: detail, date: b.dataset.date });
+    else openForm('leaves', { pin: detail, from: b.dataset.date });
+  };
+  $('k-info').onclick = (e) => e.target.closest('button[data-ke]') && $(`tab-${e.target.closest('button').dataset.ke}`).click();
   $('k-xlsx').onclick = () => exportXlsx(`${file()}.xlsx`, [summary(), days()]);
   $('k-csv').onclick = () => exportCsv(`${file()}${detail ? `-pin-${detail}` : ''}.csv`, detail ? days(detail) : summary());
   $('k-cetak').onclick = () => print($('k-judul'), (detail ? days(detail) : summary()).title);
@@ -60,35 +74,43 @@ export async function show(reason) {
   const all = [...scans, ...correctionScans(data.corrections, from, to)]; // koreksi manual dihitung sebagai scan
   // karyawan yang dikenal ditambah PIN yang punya scan, kecuali yang tidak ikut rekap
   const pins = [...new Set([...knownPins(), ...all.map((s) => s.pin)])].filter(inRecap).sort(byPin);
-  // satu hitungan per jadwal (utama dan jadwal lain), aturan toleransi/lembur sama
+  result = !(from && to) ? [] : recapAll(all, pins, from, to).sort((a, b) => byPin(a.pin, b.pin));
+  render();
+}
+
+/**
+ * recap() untuk banyak karyawan: satu hitungan per jadwal (utama dan jadwal lain), aturan toleransi/lembur
+ * sama. `until` = tanggal pertama yang belum dihitung (bawaan hari ini). Dipakai juga oleh Riwayat.
+ */
+export function recapAll(scans, pins, from, to, until = today()) {
   const groups = new Map();
   for (const pin of pins) {
     const s = scheduleOf(pin) ?? data.schedule;
     if (!groups.has(s)) groups.set(s, []);
     groups.get(s).push(pin);
   }
-  result = !(from && to) ? [] : [...groups]
-    .flatMap(([s, ps]) => recap({ scans: all, pins: ps, schedule: { ...data.schedule, days: s.days }, holidays: data.holidays, leaves: data.leaves,
-      from, to, today: today() }))
-    .sort((a, b) => byPin(a.pin, b.pin));
-  render();
+  return [...groups].flatMap(([s, ps]) => recap({ scans, pins: ps, schedule: { ...data.schedule, days: s.days }, holidays: data.holidays,
+    leaves: data.leaves, from, to, today: until }));
 }
 
-/** "Senin–Jumat 08:00–17:00, Sabtu 08:00–13:00" */
-function scheduleText(days) {
-  const groups = [];
-  [1, 2, 3, 4, 5, 6, 0].forEach((i, k) => {
-    const t = days[i] && `${days[i].start}–${days[i].end}`;
-    const g = groups.at(-1);
-    if (t && g?.t === t && g.k === k - 1) Object.assign(g, { to: i, k });
-    else if (t) groups.push({ from: i, to: i, k, t });
-  });
-  const name = (g) => (g.from === g.to ? DAY_NAMES[g.from] : `${DAY_NAMES[g.from]}–${DAY_NAMES[g.to]}`);
-  return groups.map((g) => `${name(g)} ${g.t}`).join(', ') || 'belum ada hari kerja';
-}
-
-const times = (n, min) => (n ? `${n}× · ${min} mnt` : '');
+/** Berapa kali, dengan total jam:menit di bawahnya. */
+const times = (n, min) => (n ? `<span class="dua">${n}×<small>${duration(min)}</small></span>` : '');
 const leaveDays = (t) => t.izin + t.sakit + t.cuti + t.dinas;
+
+/** Strip bulan: satu batang per hari seperti lubang kartu absen; hari yang belum dihitung berupa garis. */
+const STRIP_MAX_DAYS = 62;
+function strip(r, from, to) {
+  if (addDays(from, STRIP_MAX_DAYS) <= to) return '';
+  const byDate = new Map(r.days.map((d) => [d.date, d]));
+  const bars = [];
+  for (let date = from; date <= to; date = addDays(date, 1)) {
+    const d = byDate.get(date);
+    const kind = !d ? 'nanti' : d.status === 'hadir' ? (d.late ? 'telat' : 'hadir') : LEAVE_KINDS.includes(d.status) ? 'izin' : d.status;
+    const what = !d ? 'belum dihitung' : `${LABEL[d.status]}${d.late ? `, terlambat ${d.late} menit` : ''}`;
+    bars.push(`<i class="${kind}" title="${dayName(date).slice(0, 3)} ${dmy(date)}: ${what}"></i>`);
+  }
+  return `<span class="strip">${bars.join('')}</span>`;
+}
 /** Keterangan hari: libur, catatan izin, koreksi manual beserta alasannya, dan temuan rekap. */
 function note(d, pin) {
   const leave = LEAVE_KINDS.includes(d.status) && data.leaves.find((l) => l.pin === pin && l.from <= d.date && d.date <= l.to)?.note;
@@ -106,33 +128,47 @@ function note(d, pin) {
 function render() {
   const [from, to] = [$('k-dari').value, $('k-sampai').value];
   const s = data.schedule;
-  const last = [to, addDays(today(), -1)].sort()[0];
-  $('k-info').textContent = (from > last
-    ? 'Periode ini belum bisa dihitung: tanggalnya belum lewat. '
-    : `Dihitung ${period(from, last)}${last < to ? ' (hari ini dan sesudahnya belum dihitung)' : ''}. `) +
-    `Jam kerja ${data.schedules.length ? [{ name: 'Utama', days: s.days }, ...data.schedules].map((x) => `${x.name} ${scheduleText(x.days)}`).join('; ') : scheduleText(s.days)}` +
-    `; toleransi terlambat ${s.tolerance} menit; lembur ${s.overtimeOn === false ? 'tidak dihitung' : `mulai ${s.overtimeMin} menit`}. Ubah di Pengaturan.`;
+  const now = today();
+  const last = [to, addDays(now, -1)].sort()[0];
+  // dua kalimat: sampai kapan dihitung (hanya bila periode belum lewat semua), lalu aturan yang dipakai
+  const pending = to === now ? 'Hari ini baru dihitung besok.' : 'Hari ini dan seterusnya belum dihitung.';
+  const counted = from > last ? (from === now ? pending : 'Periode ini belum dimulai.')
+    : last < to ? `Dihitung sampai kemarin, <b>${longDate(last)}</b>. ${pending}` : '';
+  const late = s.tolerance ? `Terlambat bila masuk lebih dari <b>${s.tolerance} menit</b> setelah jam masuk.` : 'Terlambat bila masuk setelah jam masuk.';
+  const overtime = s.overtimeOn === false ? 'Lembur <b>tidak dihitung</b>.' : `Lembur dihitung mulai <b>${s.overtimeMin} menit</b> setelah jam pulang.`;
+  $('k-info').innerHTML = `${counted && `<p>${ICON_COUNTED}<span>${counted}</span></p>`}` +
+    `<p>${ICON_RULES}<span>${late} ${overtime}</span><button data-ke="jam-kerja">Ubah aturan rekap</button></p>`;
   $('rekap').classList.toggle('tanpa-lembur', s.overtimeOn === false);
-  $('rekap').classList.toggle('tanpa-dept', !result.some((x) => deptOf(x.pin)));
   const r = detail && result.find((x) => x.pin === detail);
   if (detail && !r) detail = null;
   $('k-ringkasan').hidden = !!r;
   $('k-rincian').hidden = !r;
   if (!r) {
     $('k-daftar').innerHTML = result
-      .map(({ pin, total: t }) => `<tr data-pin="${esc(pin)}" tabindex="0" class="klik" title="Lihat rincian per hari">` +
-        `<td>${esc(nameOf(pin))}</td><td class="dept">${esc(deptOf(pin))}</td><td class="num">${t.workDays}</td><td class="num">${t.present}</td>` +
+      .map((r) => [r, r.pin, r.total])
+      .map(([r, pin, t]) => `<tr data-pin="${esc(pin)}" tabindex="0" class="klik" title="Lihat rincian per hari">` +
+        `<td><span class="nama-rekap">${esc(nameOf(pin))}${deptOf(pin) ? `<small>${esc(deptOf(pin))}</small>` : ''}</span>${strip(r, from, to)}</td>` +
+        `<td class="num">${t.present}<small class="dari">/${t.workDays}</small></td>` +
         `<td class="num${t.late ? ' merah' : ''}">${times(t.late, t.lateMin)}</td><td class="num">${times(t.early, t.earlyMin)}</td>` +
-        `<td class="num">${t.noOut || ''}</td><td class="num${t.absent ? ' merah' : ''}">${t.absent || ''}</td><td class="num" title="${LEAVE_KINDS.filter((k) => t[k]).map((k) => `${LABEL[k]} ${t[k]}`).join(' · ')}">${leaveDays(t) || ''}</td>` +
+        `<td class="num${t.noOut ? ' merah' : ''}">${t.noOut || ''}</td><td class="num${t.absent ? ' merah' : ''}">${t.absent || ''}</td><td class="num" title="${LEAVE_KINDS.filter((k) => t[k]).map((k) => `${LABEL[k]} ${t[k]}`).join(' · ')}">${leaveDays(t) || ''}</td>` +
         `<td class="num">${duration(t.hours)}</td><td class="num lembur">${duration(t.overtime)}</td></tr>`)
-      .join('') || '<tr><td colspan="11" class="muted">Belum ada karyawan. Ambil data karyawan di tab Karyawan.</td></tr>';
+      .join('') || '<tr><td colspan="9" class="muted">Belum ada karyawan. Ambil data karyawan di menu Karyawan.</td></tr>';
     return;
   }
-  $('k-nama').textContent = `${nameOf(r.pin)} · PIN ${r.pin}${data.schedules.length ? ` · jadwal ${scheduleName(r.pin)}` : ''}`;
+  const t = r.total;
+  $('k-nama').textContent = nameOf(r.pin);
+  $('k-hari-info').innerHTML = [`PIN <b>${esc(r.pin)}</b>`, data.schedules.length && `Jadwal <b>${esc(scheduleName(r.pin))}</b>`,
+    `Hadir <b>${t.present}</b> dari ${t.workDays} hari kerja`, t.late && `Terlambat <b>${t.late}×</b>`, t.absent && `Alpa <b>${t.absent}</b>`,
+    t.noOut && `Lupa pulang <b>${t.noOut}</b>`].filter(Boolean).map((x) => `<span>${x}</span>`).join('');
+  // alpa: bisa izin (sakit/cuti) atau lupa scan; lupa pulang: koreksi jam pulang
+  const aksi = (d) => (d.status === 'alpa'
+    ? `<button class="mini" data-aksi="izin" data-date="${d.date}">Catat izin</button><button class="mini" data-aksi="koreksi" data-date="${d.date}">Koreksi</button>`
+    : d.noOut ? `<button class="mini" data-aksi="koreksi" data-date="${d.date}">Koreksi pulang</button>` : '');
   $('k-hari').innerHTML = r.days
     .map((d) => `<tr class="${d.status}"><td>${dayName(d.date).slice(0, 3)}, ${dmy(d.date)}</td><td>${hhmm(d.in)}</td><td>${hhmm(d.out)}</td>` +
-      `<td>${LABEL[d.status]}</td><td class="num${d.late ? ' merah' : ''}">${d.late || ''}</td><td class="num">${d.early || ''}</td>` +
-      `<td class="num">${duration(d.hours)}</td><td class="num lembur">${duration(d.overtime)}</td><td>${esc(note(d, r.pin))}</td></tr>`)
+      `<td><span class="lencana ${d.status}">${LABEL[d.status]}</span></td><td class="num${d.late ? ' merah' : ''}">${d.late || ''}</td><td class="num">${d.early || ''}</td>` +
+      `<td class="num">${duration(d.hours)}</td><td class="num lembur">${duration(d.overtime)}</td><td>${esc(note(d, r.pin))}</td>` +
+      `<td class="aksi no-print">${aksi(d)}</td></tr>`)
     .join('');
 }
 
