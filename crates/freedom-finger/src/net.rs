@@ -10,7 +10,6 @@ use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
 use std::sync::Arc;
 use std::time::Duration;
 
-use freedom_finger_sdk::tcp::{self, DEFAULT_PORT, cmd};
 use if_addrs::IfAddr;
 use serde::Serialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -26,6 +25,9 @@ const MIN_PREFIX: u8 = 22;
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(1500);
 const REPLY_TIMEOUT: Duration = Duration::from_secs(3);
 const PARALLEL: usize = 256;
+/// Port protokol mode Lokal. Hanya dipakai untuk mengenali mesin: di mode Lokal mesin menjawab
+/// handshake di sini, di mode Internet port ini menerima koneksi tetapi diam. Data absen lewat FkWeb.
+const PROBE_PORT: u16 = 5005;
 
 /// Satu jaringan IPv4 lokal: IP komputer ini + panjang prefix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,7 +106,7 @@ pub struct Found {
 /// Cari mesin di semua jaringan lokal (TCP 5005). Butuh beberapa detik.
 pub async fn scan(password: u32) -> Vec<Found> {
     let hosts = lan_nets().into_iter().flat_map(Net::hosts).collect();
-    scan_hosts(hosts, DEFAULT_PORT, password, REPLY_TIMEOUT).await
+    scan_hosts(hosts, PROBE_PORT, password, REPLY_TIMEOUT).await
 }
 
 async fn scan_hosts(hosts: Vec<Ipv4Addr>, port: u16, password: u32, reply: Duration) -> Vec<Found> {
@@ -136,9 +138,19 @@ async fn probe(ip: Ipv4Addr, port: u16, password: u32, reply: Duration) -> Optio
     Some(Found { ip, mode })
 }
 
-/// `Some(ok)` bila mesin menjawab handshake `80`.
+/// Handshake mode Lokal (perintah `80`): `55 AA | 01 | 80 | password u32 | FFFF0001 u32 | len 0 | seq 1`.
+fn handshake_frame(password: u32) -> Vec<u8> {
+    [&[0x55, 0xAA, 0x01, 0x80][..], &password.to_le_bytes(), &0xFFFF_0001u32.to_le_bytes(), &[0, 0, 1, 0]].concat()
+}
+
+/// Ack untuk seq 1: `AA 55 | 01 | 01 (diterima) atau FD | status u32 | seq u16`; `None` = belum lengkap.
+fn handshake_reply(buf: &[u8]) -> Option<bool> {
+    buf.windows(10).find(|w| w[..2] == [0xAA, 0x55] && w[8..] == [1, 0]).map(|w| w[3] == 1)
+}
+
+/// `Some(ok)` bila mesin menjawab handshake.
 async fn handshake(s: &mut TcpStream, password: u32) -> Option<bool> {
-    s.write_all(&tcp::frame(cmd::HANDSHAKE, password, 0xFFFF_0001, 0, 1, None)).await.ok()?;
+    s.write_all(&handshake_frame(password)).await.ok()?;
     let (mut buf, mut chunk) = (Vec::new(), [0u8; 256]);
     loop {
         let n = s.read(&mut chunk).await.ok()?;
@@ -146,8 +158,8 @@ async fn handshake(s: &mut TcpStream, password: u32) -> Option<bool> {
             return None;
         }
         buf.extend_from_slice(&chunk[..n]);
-        if let Some(r) = tcp::parse_reply(&buf, 1, 0) {
-            return Some(r.ok);
+        if let Some(ok) = handshake_reply(&buf) {
+            return Some(ok);
         }
     }
 }
@@ -172,6 +184,11 @@ mod tests {
 
     #[tokio::test]
     async fn pencarian_membedakan_mode() {
+        // bingkai yang dijawab mesin asli; ack diterima (01) dan ditolak karena password (00)
+        assert_eq!(handshake_frame(0), [0x55, 0xAA, 0x01, 0x80, 0, 0, 0, 0, 0x01, 0x00, 0xFF, 0xFF, 0, 0, 0x01, 0x00]);
+        assert_eq!(handshake_reply(&[0xAA, 0x55, 0x01, 0x01, 0, 0, 0, 0, 0x01, 0x00]), Some(true));
+        assert_eq!(handshake_reply(&[0xAA, 0x55, 0x01, 0x00, 0, 0, 0, 0, 0x01, 0x00]), Some(false));
+        assert_eq!(handshake_reply(&[0xAA, 0x55, 0x01]), None);
         // mesin mode Lokal: menjawab handshake dengan ack OK
         let lokal = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = lokal.local_addr().unwrap().port();

@@ -3,10 +3,11 @@
 //!
 //! Alur: mesin `POST /` dengan header `request_code` ([`request_code`]); untuk `receive_cmd` server
 //! membalas header `response_code`/`trans_id`/`cmd_code` dan body = parameter perintah ([`Command`]).
-//! Spesifikasi lengkap: `docs/protokol.md` bagian 14.
+//! Spesifikasi lengkap: `docs/protokol.md`.
 
 mod command;
 mod message;
+pub mod record;
 
 pub use command::Command;
 pub use message::{Enroll, LogData, Poll, RealtimeLog, UserIdList, UserInfo, backup_number, privilege};

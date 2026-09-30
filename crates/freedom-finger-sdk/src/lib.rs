@@ -1,14 +1,10 @@
 //! SDK mesin absensi **Fingerspot Revo WF-206BNC** (platform SmackBio FK, `CommunicationInterfaceId` 13_1).
 //!
-//! Mesin punya dua jalur yang tidak bisa aktif bersamaan (menu **Jaringan → Mode**):
+//! Protokol [`fkweb`]: mesin di **mode Internet** (menu **Jaringan → Mode**) mengirim ke server lewat
+//! HTTP: log realtime, user + template, daftar jari/wajah jarak jauh, dan perintah dari server.
 //!
-//! | Mode | Modul | Arah | Isi |
-//! |---|---|---|---|
-//! | Lokal | [`tcp`] | aplikasi → mesin, TCP 5005 | log, jam, kelola user, keypad |
-//! | Internet | [`fkweb`] | mesin → server, HTTP | log realtime, user + template, daftar jari/wajah jarak jauh |
-//!
-//! Logika protokol tidak melakukan I/O (sans-IO), jadi bisa diuji tanpa mesin. I/O hanya ada di
-//! [`tcp::Client`] (blocking `std::net`); server FkWeb dibangun pemakai, contohnya crate `freedom-finger`.
+//! Logika protokol tidak melakukan I/O (sans-IO), jadi bisa diuji tanpa mesin. Server HTTP-nya
+//! dibangun pemakai, contohnya crate `freedom-finger`.
 //!
 //! ```
 //! use freedom_finger_sdk::fkweb::{Body, Command};
@@ -22,5 +18,4 @@
 #![warn(missing_docs)]
 
 pub mod fkweb;
-pub mod tcp;
 pub mod time;

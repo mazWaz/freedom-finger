@@ -1,6 +1,6 @@
-//! Logika server tanpa HTTP: request mesin (FkWeb, `docs/protokol.md` bagian 14) dan endpoint API
+//! Logika server tanpa HTTP: request mesin (FkWeb, `docs/protokol.md`) dan endpoint API
 //! bergaya developer.fingerspot.io. Pemetaan API -> perintah FkWeb disadap lewat relay pada
-//! 29-09-2026 (`docs/riset.md` bagian 10).
+//! 29-09-2026 (`docs/riset.md` bagian 5).
 //!
 //! | Endpoint | Perintah mesin | Catatan |
 //! |---|---|---|
@@ -31,10 +31,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
+use freedom_finger_sdk::fkweb::record::USER_SIZE;
 use freedom_finger_sdk::fkweb::{
     Body, Command, Enroll, LogData, Poll, RealtimeLog, UserIdList, UserInfo, backup_number, privilege, request_code, response_code,
 };
-use freedom_finger_sdk::tcp::record::USER_SIZE;
 use freedom_finger_sdk::time::WallTime;
 use jiff::Timestamp;
 use jiff::tz::TimeZone;

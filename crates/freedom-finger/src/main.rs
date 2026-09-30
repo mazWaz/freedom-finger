@@ -7,10 +7,8 @@
 //! freedom-finger status       server jalan? mesin terhubung?
 //! freedom-finger cari         cari mesin di jaringan lokal
 //! freedom-finger backup FILE  salin database ke FILE (aman saat server berjalan)
-//! freedom-finger mesin …      perintah langsung ke mesin di mode Lokal (TCP 5005)
 //! ```
 
-mod mesin;
 mod setup;
 
 use std::error::Error;
@@ -57,8 +55,6 @@ enum Cmd {
         /// File tujuan, belum boleh ada
         file: PathBuf,
     },
-    /// Perintah langsung ke mesin di mode Lokal (TCP 5005)
-    Mesin(mesin::Args),
     /// Titik masuk layanan Windows
     #[command(hide = true)]
     ServiceRun,
@@ -113,7 +109,6 @@ fn run(cli: Cli) -> Result<()> {
             Store::open(&cfg.db)?.backup_to(&file)?;
             println!("✓ {} disalin ke {}", cfg.db.display(), file.display());
         }
-        Cmd::Mesin(a) => mesin::run(a)?,
         Cmd::ServiceRun => service_run()?,
     }
     Ok(())
@@ -191,7 +186,7 @@ fn cari(port: u16, password: u32) -> Result<()> {
             .into_iter()
             .map(|f| {
                 let note = match f.mode {
-                    net::Mode::Lokal => "mesin di mode Lokal (siap untuk `freedom-finger mesin --host …`)",
+                    net::Mode::Lokal => "mesin di mode Lokal: ubah ke Mode Internet (Menu → Jaringan) agar mengirim ke server ini",
                     net::Mode::Ditolak => "mesin di mode Lokal, password komunikasi berbeda (--password)",
                     net::Mode::Diam => "kemungkinan mesin di mode Internet",
                 };

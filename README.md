@@ -170,12 +170,11 @@ curl -s http://localhost:8013/api/get_attlog -H "Authorization: Bearer $TOKEN" \
 | `freedom-finger status` | Server berjalan? Mesin terhubung? Jumlah absen |
 | `freedom-finger cari` | Cari mesin di jaringan lokal, beserta petunjuk untuk tiap mesin |
 | `freedom-finger backup FILE` | Salin database ke `FILE`, aman saat server berjalan. Isinya termasuk data jari/wajah: simpan di tempat aman |
-| `freedom-finger mesin …` | Perintah langsung ke mesin di mode Lokal: `log`, `jam`, `list`, `add`, `edit`, `delete` |
 
 | Folder | Isi |
 |---|---|
 | `crates/freedom-finger` | Program dan library server: menerima data mesin, API bergaya developer.fingerspot.io, SQLite |
-| `crates/freedom-finger-sdk` | SDK: protokol TCP 5005 (mode Lokal) dan FkWeb (mode Internet) |
+| `crates/freedom-finger-sdk` | SDK: protokol FkWeb (mode Internet), tanpa I/O |
 | `examples/tauri-dashboard` | Aplikasi desktop untuk pengguna, sekaligus contoh dan demo: server tertanam, riwayat, rekap, export, backup |
 
 ## Build and test
@@ -206,17 +205,6 @@ menang bila keduanya ada.
 
 Dokumentasi API: `docs/api.md`.
 
-## Local mode commands
-
-`freedom-finger mesin …` hanya jalan saat mesin di mode **Lokal**; selama itu server tidak
-menerima data.
-
-```sh
-freedom-finger mesin --host 192.168.1.201 list
-freedom-finger mesin --host 192.168.1.201 log > absensi.csv
-freedom-finger mesin --help    # semua perintah dan variabel FK_*
-```
-
 ## Documents
 
 | File | Isi |
@@ -225,7 +213,7 @@ freedom-finger mesin --help    # semua perintah dan variabel FK_*
 | `docs/operasional.md` | Menjalankan server, API, pekerjaan sehari-hari, masalah umum |
 | `docs/api.md` | API untuk aplikasi: endpoint, contoh, event realtime |
 | `docs/openapi.yaml` | Spesifikasi API (OpenAPI 3.1) |
-| `docs/protokol.md` | Spesifikasi TCP 5005 dan FkWeb, test vector |
+| `docs/protokol.md` | Spesifikasi FkWeb (mode Internet), rekaman biner, dan handshake untuk pencarian mesin |
 | `docs/riset.md` | Laporan riset dan riwayat keputusan |
 
 ## License

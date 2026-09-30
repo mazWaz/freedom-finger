@@ -3,7 +3,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
 use super::Body;
-use crate::tcp::record::{LOG_SIZE, LogRecord, USER_SIZE, UserEntry, Verify, verify_kinds};
+use super::record::{LOG_SIZE, LogRecord, USER_SIZE, UserEntry, Verify, verify_kinds};
 use crate::time::WallTime;
 
 /// Nomor kredensial (`backup_number`).
@@ -53,9 +53,9 @@ pub struct RealtimeLog {
     pub user_id: String,
     /// `YYYYMMDDhhmmss`
     pub io_time: String,
-    /// Aksi << 24 (1 masuk, 2 pulang); sama dengan byte 40-43 log TCP 5005.
+    /// Aksi << 24 (1 masuk, 2 pulang); sama dengan byte 40-43 record log `GET_LOG_DATA`.
     pub io_mode: u32,
-    /// Sama dengan byte 44-47 log TCP 5005.
+    /// Sama dengan byte 44-47 record log `GET_LOG_DATA`.
     pub verify_mode: u32,
     /// `"BIN_1"` bila ada foto absen; di mesin ini selalu `null`.
     pub log_image: Option<String>,
@@ -126,7 +126,7 @@ impl UserInfo {
     }
 }
 
-/// Hasil `GET_USER_ID_LIST`: record 36 byte seperti daftar user TCP 5005.
+/// Hasil `GET_USER_ID_LIST`: record 36 byte per user ([`UserEntry`]).
 #[derive(Debug, Clone, Deserialize)]
 pub struct UserIdList {
     /// Ukuran satu record (36).
@@ -144,7 +144,7 @@ impl UserIdList {
     }
 }
 
-/// Hasil `GET_LOG_DATA`: semua log, record 48 byte seperti `A4` di TCP 5005.
+/// Hasil `GET_LOG_DATA`: semua log, record 48 byte ([`LogRecord`]).
 #[derive(Debug, Clone, Deserialize)]
 pub struct LogData {
     /// Jumlah log.

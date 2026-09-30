@@ -1,7 +1,7 @@
 # Operations guide
 
 Mesin Fingerspot Revo WF-206BNC mengirim data ke `freedom-finger` di komputer Anda, bukan
-ke cloud Fingerspot. Latar belakang: `riset.md` bagian 10. Protokol: `protokol.md` bagian 14.
+ke cloud Fingerspot. Latar belakang: `riset.md` bagian 5. Protokol: `protokol.md`.
 
 
 ## 1. Settings that must stay fixed
@@ -13,8 +13,8 @@ ke cloud Fingerspot. Latar belakang: `riset.md` bagian 10. Protokol: `protokol.m
 | Komputer server | Menyala terus. Selama server mati, mesin menyimpan log dan mengirimnya setelah server hidup lagi. |
 | `freedom-finger.env` di folder data | Dibuat otomatis berisi `FKWEB_TOKEN` (token API); opsional `FKWEB_DEVICES`, `FKWEB_WEBHOOK`; daftar lengkap di `README.md` |
 
-Mode **Lokal** hanya perlu untuk `freedom-finger mesin …` (port 5005: kunci keypad, jadwal shift).
-Selama mode Lokal, server tidak menerima apa pun. Kembalikan ke Internet setelah selesai.
+Mode **Lokal** tidak dipakai. Selama mesin di mode Lokal, server tidak menerima apa pun;
+`freedom-finger cari` menunjukkan mesin yang masih di mode Lokal.
 
 ## 2. Running the server
 
@@ -93,7 +93,6 @@ Hak akses: `1` user, `2` admin (MANAGER), `3` subadmin (OPERATOR).
 | Perintah `status: timeout` | Mesin tidak menjawab perintah atau PIN yang tidak dikenal (misalnya PIN tidak ada). |
 | Jam log 2015 | Mesin sempat mati listrik. Server menyetel jam otomatis; log yang terlanjur tercatat bertanggal 2015 perlu dikoreksi manual. |
 | "gambar sidik jari tidak cukup" saat daftar | Tempel bantalan jari rata, diam sampai bunyi, angkat penuh; jari jangan terlalu kering. |
-| `mesin …`: mesin tidak menjawab handshake | Mesin sedang di mode Internet. Pindah ke mode Lokal di menu Jaringan. |
 | Windows: "Windows protected your PC" | Program belum bertanda tangan. Klik **More info → Run anyway**. |
 | macOS: "cannot be opened because the developer cannot be verified" | Program belum bertanda tangan. Jalankan `xattr -d com.apple.quarantine freedom-finger` di folder program. |
 

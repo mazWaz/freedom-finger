@@ -48,7 +48,7 @@ export function scanRoles(scans, minGap) {
 
 /**
  * Data user yang disimpan server (`get_backup` -> `template`): body FkWeb
- * u32 LE panjang JSON+NUL | JSON | [u32 LE panjang | biner]... (docs/protokol.md bagian 14).
+ * u32 LE panjang JSON+NUL | JSON | [u32 LE panjang | biner]... (docs/protokol.md bagian 3).
  * Hasil `{info, bins}` (JSON dan blok biner, dirujuk JSON sebagai "BIN_n"), atau null.
  */
 export function fkBody(body) {

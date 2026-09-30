@@ -1,29 +1,29 @@
 # Architecture
 
-Workspace Rust berisi tiga crate: SDK protokol mesin, server pengganti developer.fingerspot.io,
-dan CLI untuk mode Lokal. Perilakunya disalin dari prototipe TypeScript yang sudah berjalan di
+Workspace Rust berisi dua crate: SDK protokol FkWeb dan server pengganti developer.fingerspot.io.
+Perilakunya disalin dari prototipe TypeScript yang sudah berjalan di
 produksi. Pada 29-09-2026 kedua versi diuji banding memakai salinan database dan request
 yang sama: jawabannya identik, kecuali teks satu pesan error.
 
 ```text
                  mesin Fingerspot Revo WF-206BNC
-          mode Internet │ HTTP POST / (FkWeb)               mode Lokal │ TCP 5005
-                        ▼                                              ▲
- aplikasi ─ POST /api/<endpoint> ─────▶ freedom-finger            mesin (CLI)
- webhook, SSE ◀─ attlog, hasil perintah ─┤ http → service → store      │
-                                         │        │        (SQLite)    │
-                                         └ freedom_finger_sdk::fkweb   freedom_finger_sdk::tcp::Client
+          mode Internet │ HTTP POST / (FkWeb)
+                        ▼
+ aplikasi ─ POST /api/<endpoint> ─────▶ freedom-finger
+ webhook, SSE ◀─ attlog, hasil perintah ─┤ http → service → store (SQLite)
+                                         └ freedom_finger_sdk::fkweb
 ```
 
-Mesin hanya bisa di satu mode pada satu waktu (menu **Jaringan → Mode**). Selama mesin di
-mode Lokal, server tidak menerima data.
+Mesin harus di mode **Internet** (menu **Jaringan → Mode**). Selama mesin di mode Lokal, server
+tidak menerima data. Satu-satunya sisa mode Lokal adalah handshake TCP 5005 di `net`, untuk
+mengenali mesin saat pencarian (`protokol.md` bagian 9).
 
 ## Crates
 
 | Crate | Isi | Dependency utama |
 |---|---|---|
-| `crates/freedom-finger-sdk` | `tcp` (bingkai, record, `Client`), `fkweb` (`Body`, pesan, `Command`), `time` (`WallTime`) | serde, thiserror; tanpa tokio dan HTTP |
-| `crates/freedom-finger` | library `config`, `store`, `service`, `http`, `net`; program `main`, `setup` (layanan OS), `mesin` (TCP 5005) | axum, tokio, rusqlite (SQLite bawaan), ureq, jiff, clap, if-addrs, windows-service |
+| `crates/freedom-finger-sdk` | `fkweb` (`Body`, pesan, `Command`, `record`), `time` (`WallTime`) | serde, thiserror; tanpa tokio dan HTTP |
+| `crates/freedom-finger` | library `config`, `store`, `service`, `http`, `net`; program `main`, `setup` (layanan OS) | axum, tokio, rusqlite (SQLite bawaan), ureq, jiff, clap, if-addrs, windows-service |
 
 Aplikasi memakai server lewat HTTP saja (`docs/api.md`); tidak ada pustaka klien. Aplikasi Rust
 bisa menanam server langsung lewat `freedom_finger::serve()`, seperti `examples/tauri-dashboard`.
@@ -49,13 +49,12 @@ di `http.rs`. Endpoint baru: tambahkan juga ke `docs/api.md` dan `docs/openapi.y
 | Keputusan | Alasan |
 |---|---|
 | Virtual manifest, semua crate sejajar di `crates/` | Pola workspace besar rust-analyzer ([matklad](https://matklad.github.io/2021/08/22/large-rust-workspaces.html)); menambah crate tidak mengubah struktur |
-| Logika protokol tanpa I/O, kecuali `tcp::Client` | Bisa diuji dengan byte asli dari mesin tanpa jaringan ([sans-IO](https://www.firezone.dev/blog/sans-io)) |
-| `tcp::Client` blocking (`std::net`), bukan async | Mesin melayani satu perintah pada satu waktu; pemakai SDK tidak dipaksa memakai tokio |
+| Logika protokol tanpa I/O | Bisa diuji dengan byte asli dari mesin tanpa jaringan ([sans-IO](https://www.firezone.dev/blog/sans-io)) |
+| Hanya FkWeb (mode Internet); protokol mode Lokal TCP 5005 dihapus 01-10-2026 | Log realtime dan daftar jari/wajah jarak jauh hanya ada di FkWeb, dan mesin tidak bisa di dua mode sekaligus. Handshake TCP 5005 tetap ada untuk pencarian mesin. |
 | `WallTime` polos, zona selalu diberikan pemanggil | Jam mesin adalah jam dinding WIB, sedangkan zona proses bisa UTC (launchd, uji otomatis). Salah zona pernah menggeser jam 7 jam (`riset.md`). |
 | Satu kunci (`Mutex`) untuk seluruh `Service` | Satu mesin dan satu aplikasi; SQLite juga satu penulis. Ganti ke kunci per mesin bila mesin bertambah. |
-| Log dibaca dengan `A4`, bukan `A1`/`A2` | Penanda "sudah dibaca" di mesin dipakai bersama software lain |
-| Tidak ada perintah hapus massal (`C1`) | Permintaan pemilik: hapus hanya per PIN |
-| Status masuk/pulang disimpan apa adanya | Mesin mengganti status menurut jam; aturan kerja belum ada |
+| Tidak ada perintah hapus massal (`CLEAR_*`) | Permintaan pemilik: hapus hanya per PIN |
+| Status masuk/pulang disimpan apa adanya | Mesin mengganti status menurut jam; masuk/pulang dihitung aplikasi dari jam dan urutan scan |
 | Server berjalan di Windows, Linux, atau macOS | Keputusan 29-09-2026. Kode tidak memakai API khusus OS; zona `Asia/Jakarta` ikut dibundel untuk Windows (`jiff`). |
 | Satu folder aplikasi: program, pengaturan, `absensi.db`, `photos/` | `/opt/freedom-finger` (Linux) atau `C:\FreedomFinger` (Windows), dijalankan sebagai layanan OS |
 | Tiga beda sengaja dari server TypeScript | Foto ditulis sebelum log dicatat; `io_time` divalidasi karena dipakai di nama file; error database dijawab 500, bukan 400 |
@@ -71,21 +70,13 @@ di `http.rs`. Endpoint baru: tambahkan juga ke `docs/api.md` dan `docs/openapi.y
    lalu cek `get_result`.
 5. Perbarui tabel endpoint di kepala `service.rs` dan `operasional.md` bagian 4.
 
-## Adding a TCP 5005 command
-
-1. Kode perintah di `tcp::cmd`; susunan byte sebagai fungsi murni di `tcp/record.rs`,
-   dengan test vector.
-2. Metode di `Client` (lewat `must` atau `read_paged`).
-3. Subperintah di `crates/freedom-finger/src/mesin.rs` bila perlu.
-4. Catat di `protokol.md` (bagian 5, 6, dan 11) beserta tanda statusnya.
-
 ## Tests and checks
 
 | Perintah | Isi |
 |---|---|
-| `cargo test --workspace` | Uji SDK dengan test vector `protokol.md` bagian 12, server dengan mesin disimulasikan, dan argumen CLI. Tanpa mesin. |
+| `cargo test --workspace` | Uji SDK dengan byte hasil sadapan dari mesin, server dengan mesin disimulasikan, dan pencarian mesin. Tanpa mesin. |
 | `cargo clippy --workspace --all-targets -- -D warnings` | Lint; SDK juga wajib punya dokumentasi di setiap API publik |
 | `cargo fmt --all --check` | Gaya kode (`rustfmt.toml`) |
 | `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` | Dokumentasi tanpa peringatan |
 
-Uji langsung ke mesin belum ada di repo ini; urutan ujinya tercatat di `protokol.md` bagian 11.
+Uji langsung ke mesin belum ada di repo ini; hasil uji di mesin tercatat di `riset.md` bagian 5.
