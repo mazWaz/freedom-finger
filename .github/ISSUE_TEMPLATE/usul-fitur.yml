@@ -1,0 +1,25 @@
+name: Usul fitur
+description: Ide agar Freedom Finger lebih berguna
+labels: [enhancement]
+body:
+  - type: textarea
+    id: masalah
+    attributes:
+      label: Masalah apa yang ingin diselesaikan?
+      description: Ceritakan kebutuhan di kantor Anda, misalnya "HRD harus menghitung lembur shift malam secara manual".
+    validations:
+      required: true
+  - type: textarea
+    id: usulan
+    attributes:
+      label: Usulan Anda
+      description: Bagaimana sebaiknya aplikasi membantu? Boleh sketsa atau contoh laporan.
+  - type: dropdown
+    id: produk
+    attributes:
+      label: Bagian yang terkait
+      options:
+        - Aplikasi desktop
+        - Program server (freedom-finger)
+        - SDK atau API
+        - Wiki atau dokumentasi

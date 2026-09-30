@@ -97,7 +97,8 @@ mesin selalu mengirim ke IP yang sama. Aplikasi memberi peringatan bila IP-nya b
 
 - [Wiki](https://github.com/mazWaz/freedom-finger/wiki): panduan lengkap untuk pemakai, dari memasang sampai membaca rekap.
 - [Pertanyaan Umum](https://github.com/mazWaz/freedom-finger/wiki/Pertanyaan-Umum) dan [Mengatasi Masalah](https://github.com/mazWaz/freedom-finger/wiki/Mengatasi-Masalah).
-- Menemukan bug atau punya usul? Buka [Issue](https://github.com/mazWaz/freedom-finger/issues/new).
+- Menemukan bug atau punya usul? Buka [Issue](https://github.com/mazWaz/freedom-finger/issues/new/choose).
+- Ingin ikut membangun? Baca [panduan kontribusi](.github/CONTRIBUTING.md). Celah keamanan dilaporkan secara pribadi, lihat [SECURITY.md](.github/SECURITY.md).
 - Suka proyek ini? Beri **Star** agar lebih banyak kantor menemukannya.
 
 ### In English

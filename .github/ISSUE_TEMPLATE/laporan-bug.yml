@@ -1,0 +1,61 @@
+name: Laporan bug
+description: Ada yang tidak berjalan seperti seharusnya
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Terima kasih sudah melapor. **Jangan lampirkan data asli**: nama karyawan, `absensi.db`, backup, token API, atau data jari/wajah. Celah keamanan dilaporkan lewat tab **Security**, bukan di sini.
+  - type: dropdown
+    id: produk
+    attributes:
+      label: Bagian yang bermasalah
+      options:
+        - Aplikasi desktop
+        - Program server (freedom-finger)
+        - SDK atau API
+        - Wiki atau dokumentasi
+    validations:
+      required: true
+  - type: input
+    id: versi
+    attributes:
+      label: Versi aplikasi
+      description: Nomor di halaman rilis tempat Anda mengunduh. Bila tidak tahu, buka http://localhost:8013/status.json di browser komputer itu, lalu lihat bagian "version".
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Sistem operasi komputer
+      options:
+        - Windows 10/11
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: mesin
+    attributes:
+      label: Model mesin absensi
+      placeholder: Fingerspot Revo WF-206BNC
+  - type: textarea
+    id: kejadian
+    attributes:
+      label: Apa yang terjadi?
+      description: Ceritakan dengan kata-kata sendiri. Tangkapan layar sangat membantu (samarkan nama karyawan).
+    validations:
+      required: true
+  - type: textarea
+    id: langkah
+    attributes:
+      label: Langkah untuk mengulangi
+      placeholder: |
+        1. Buka menu ...
+        2. Klik ...
+        3. Muncul ...
+  - type: textarea
+    id: harapan
+    attributes:
+      label: Seharusnya bagaimana?

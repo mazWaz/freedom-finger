@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Panduan pemakaian (Wiki)
+    url: https://github.com/mazWaz/freedom-finger/wiki
+    about: Cara memasang, menghubungkan mesin, dan membaca rekap. Banyak pertanyaan sudah terjawab di sini.
+  - name: Mengatasi masalah
+    url: https://github.com/mazWaz/freedom-finger/wiki/Mengatasi-Masalah
+    about: Mesin tidak terhubung, absen tidak muncul, dan masalah umum lain.
+  - name: Laporkan celah keamanan
+    url: https://github.com/mazWaz/freedom-finger/security/advisories/new
+    about: Laporan pribadi, hanya terlihat oleh pengelola.
