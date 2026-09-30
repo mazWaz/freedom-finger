@@ -5,7 +5,7 @@
 //! Data di folder data aplikasi; `FKWEB_PORT` dll. tetap berlaku.
 //!
 //! Halaman memakai API HTTP server seperti aplikasi lain. Sisi Rust hanya mengerjakan yang tidak
-//! bisa dilakukan halaman: `aplikasi.json`, file export, backup/pulihkan, dan cetak.
+//! bisa dilakukan halaman: `aplikasi.json`, file export, backup/pulihkan, cetak, dan update aplikasi.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -22,6 +22,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, State, WindowEvent};
 use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_updater::UpdaterExt;
 
 /// Argumen saat dijalankan otomatis ketika login: mulai di tray, tanpa jendela.
 const AUTOSTART_ARG: &str = "--tray";
@@ -318,6 +319,35 @@ fn fit_to_screen(w: &tauri::WebviewWindow) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Versi baru untuk halaman: nomor versinya dan versi yang terpasang.
+#[derive(serde::Serialize)]
+struct Update {
+    version: String,
+    current: String,
+}
+
+/// Versi baru di `latest.json` rilis GitHub terbaru (`plugins.updater` di tauri.conf.json), atau `None`.
+/// Build debug (`tauri dev`) tidak pernah diperbarui: ia tidak terpasang sebagai aplikasi.
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Res<Option<Update>> {
+    if cfg!(debug_assertions) {
+        return Ok(None);
+    }
+    let u = app.updater().map_err(err)?.check().await.map_err(err)?;
+    Ok(u.map(|u| Update { version: u.version, current: u.current_version }))
+}
+
+/// Unduh versi baru, periksa tanda tangannya dengan `pubkey`, pasang, lalu mulai ulang. Windows: installer
+/// NSIS menutup aplikasi sendiri dan membukanya lagi setelah selesai.
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Res<()> {
+    let u = app.updater().map_err(err)?.check().await.map_err(err)?.ok_or("tidak ada versi baru")?;
+    u.download_and_install(|_, _| {}, || {}).await.map_err(err)?;
+    // lewat event Exit, supaya kunci satu-instans dilepas sebelum aplikasi baru hidup
+    app.request_restart();
+    Ok(())
+}
+
 fn show(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
@@ -332,6 +362,7 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _, _| show(app)))
         .plugin(tauri_plugin_autostart::Builder::new().arg(AUTOSTART_ARG).build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // hanya build rilis: `tauri dev` tidak mendaftarkan dirinya sebagai program login
             // ponytail: autostart selalu dinyalakan; tambah tombol matikan bila ada yang minta
@@ -422,7 +453,9 @@ fn main() {
             default_backup_dir,
             backup,
             restore,
-            print
+            print,
+            check_update,
+            install_update
         ])
         .run(tauri::generate_context!())
         .expect("aplikasi gagal dijalankan");

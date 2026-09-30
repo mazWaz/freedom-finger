@@ -4,13 +4,18 @@
 // PC tidak menyala 24 jam: saat start, semua log mesin ditarik (sync_attlog) untuk menyusul absen
 // selama PC mati, karena antrean kiriman mesin sendiri masuk pelan.
 // Tampilan terkunci sampai kata sandi benar (kunci.js); tugas latar tetap berjalan.
+// Versi baru di rilis GitHub: tombol di sidebar, dipasang setelah pengguna setuju (checkUpdate).
 import '@fontsource-variable/plus-jakarta-sans';
+import { invoke } from '@tauri-apps/api/core';
+import { ask } from '@tauri-apps/plugin-dialog';
 import {
   CalendarCheck, CalendarX, Clock, DatabaseBackup, Download, FilePenLine, FileSpreadsheet, FileText, FingerprintPattern, History, Lock, PenLine, Plus,
   Printer, Settings, Sheet, UserPlus, Users,
   createIcons,
 } from 'lucide';
-import { $, api, bus, closeDrawer, connect, data, devices, emit, listen, loadData, loadDevices, loadFirstScans, loadUsers, noteScan } from './app.js';
+import {
+  $, api, bus, closeDrawer, connect, data, devices, emit, listen, loadData, loadDevices, loadFirstScans, loadUsers, noteScan, notify, waiting,
+} from './app.js';
 import * as hariIni from './hari-ini.js';
 import * as izin from './izin.js';
 import * as karyawan from './karyawan.js';
@@ -52,8 +57,40 @@ function sidebar() {
   $('status-samping').textContent = devices.length ? `${on}/${devices.length} mesin terhubung` : 'Belum ada mesin';
 }
 
+let guided = false; // panduan otomatis cukup sekali per aplikasi dibuka
+
+/**
+ * Versi baru (latest.json di rilis GitHub terbaru, ditandatangani kunci updater): tombol di sidebar. Diperiksa saat
+ * start dan sekali sehari; build `tauri dev` tidak pernah mendapat update (check_update = null).
+ */
+async function checkUpdate() {
+  const u = await invoke('check_update').catch(() => null); // tanpa internet: diam, dicoba lagi besok
+  $('pembaruan').hidden = !u;
+  if (!u) return;
+  $('pembaruan').querySelector('span').textContent = `Pasang versi ${u.version}`;
+  $('pembaruan').onclick = async () => {
+    if (!(await ask(`Versi ${u.version} tersedia (sekarang ${u.current}). Aplikasi mengunduh update, lalu mulai ulang dalam ±1 menit.\n\n` +
+      'Data tidak berubah. Absen selama itu tetap tersimpan di mesin dan masuk setelah aplikasi hidup lagi.',
+    { title: 'Update aplikasi', kind: 'info', okLabel: 'Pasang sekarang', cancelLabel: 'Nanti' }))) return;
+    waiting(`Mengunduh dan memasang versi ${u.version}…`);
+    try {
+      await invoke('install_update'); // berhasil: aplikasi mulai ulang (Windows: installer menutupnya)
+    } catch (e) {
+      waiting();
+      notify(`Update gagal: ${e}. Coba lagi nanti, atau unduh installer dari halaman rilis.`, true);
+    }
+  };
+}
+
 async function main() {
-  kunci.init(() => open(active)); // setelah dibuka: gambar ulang tab supaya datanya terbaru
+  // setelah dibuka: gambar ulang tab supaya datanya terbaru; pemasangan baru (belum pernah ada mesin): panduan
+  kunci.init(() => {
+    open(active);
+    if (!devices.length && !guided) {
+      guided = true;
+      mesin.guide();
+    }
+  });
   await connect();
   await loadData();
   // server di dalam aplikasi baru saja dinyalakan: beri waktu sampai port-nya siap
@@ -98,6 +135,8 @@ async function main() {
   karyawan.resumePull();
   mesin.resume();
   pengaturan.autoBackup();
+  checkUpdate();
+  setInterval(checkUpdate, 24 * 3600_000);
   // status mesin terhubung/terputus (event devices juga menangani ganti hari), karyawan baru dari mesin
   setInterval(async () => {
     await loadDevices().catch(() => {});

@@ -47,6 +47,15 @@
         "installMode": "perMachine",
         "installerHooks": "./windows/hooks.nsh"
       }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVCMDI0QTE4Q0IyMzA3ODgKUldTSUJ5UExHRW9DVzlyTWRNZ0M2WTIxVVZDQzVFUXdIL3p5Y2RlKzh3WGgyRHBZaVpZOGkweSsK",
+      "endpoints": [
+        "https://github.com/mazWaz/freedom-finger/releases/latest/download/latest.json"
+      ]
     }
   }
 }

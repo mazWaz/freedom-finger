@@ -54,16 +54,21 @@ jobs:
           path: dist/*
 
   # Aplikasi desktop untuk pengguna akhir (examples/tauri-dashboard): server tertanam + dashboard.
+  # Paket update ditandatangani kunci updater Tauri (secret pemilik repo); job release membuat latest.json.
   app:
     strategy:
       fail-fast: false
       matrix:
         include:
           - { os: windows-latest, bundles: nsis }
-          - { os: macos-latest, bundles: dmg, target: universal-apple-darwin }
+          # app: .app.tar.gz untuk update otomatis
+          - { os: macos-latest, bundles: 'app,dmg', target: universal-apple-darwin }
           # Ubuntu 22.04: glibc lebih lama, jadi .deb dan .AppImage jalan di distro yang lebih tua juga
           - { os: ubuntu-22.04, bundles: 'deb,appimage' }
     runs-on: ${{ matrix.os }}
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     defaults:
       run:
         shell: bash
@@ -86,11 +91,17 @@ jobs:
         run: |
           mkdir -p ../../dist
           b=src-tauri/target/${{ matrix.target || '.' }}/release/bundle
+          # .sig = tanda tangan paket update (isinya masuk latest.json)
           case "$RUNNER_OS" in
-            Windows) cp "$b"/nsis/*-setup.exe ../../dist/freedom-finger-desktop-windows-x64-setup.exe ;;
-            macOS) cp "$b"/dmg/*.dmg ../../dist/freedom-finger-desktop-macos.dmg ;;
+            Windows) cp "$b"/nsis/*-setup.exe ../../dist/freedom-finger-desktop-windows-x64-setup.exe
+                     cp "$b"/nsis/*-setup.exe.sig ../../dist/freedom-finger-desktop-windows-x64-setup.exe.sig ;;
+            macOS) cp "$b"/dmg/*.dmg ../../dist/freedom-finger-desktop-macos.dmg
+                   cp "$b"/macos/*.app.tar.gz ../../dist/freedom-finger-desktop-macos.app.tar.gz
+                   cp "$b"/macos/*.app.tar.gz.sig ../../dist/freedom-finger-desktop-macos.app.tar.gz.sig ;;
             Linux) cp "$b"/deb/*.deb ../../dist/freedom-finger-desktop-linux-x64.deb
-                   cp "$b"/appimage/*.AppImage ../../dist/freedom-finger-desktop-linux-x64.AppImage ;;
+                   cp "$b"/appimage/*.AppImage ../../dist/freedom-finger-desktop-linux-x64.AppImage
+                   cp "$b"/appimage/*.AppImage.sig ../../dist/freedom-finger-desktop-linux-x64.AppImage.sig
+                   npx tauri signer sign ../../dist/freedom-finger-desktop-linux-x64.deb ;;
           esac
           ls -la ../../dist
       # PC Windows bersih: pasang, firewall terbuka, server di dalam aplikasi menjawab, lalu uninstall bersih
@@ -127,6 +138,18 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      # update otomatis: aplikasi terpasang membaca releases/latest/download/latest.json (plugins.updater)
+      - name: latest.json
+        run: |
+          u="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME"
+          p() { jq -n --arg url "$u/$1" --arg signature "$(cat "dist/$1.sig")" '{url: $url, signature: $signature}'; }
+          mac=$(p freedom-finger-desktop-macos.app.tar.gz)
+          jq -n --arg version "${GITHUB_REF_NAME#v}" --arg pub_date "$(date -u +%FT%TZ)" --argjson win "$(p freedom-finger-desktop-windows-x64-setup.exe)" \
+            --argjson mac "$mac" --argjson appimage "$(p freedom-finger-desktop-linux-x64.AppImage)" --argjson deb "$(p freedom-finger-desktop-linux-x64.deb)" \
+            '{version: $version, pub_date: $pub_date, platforms: {"windows-x86_64": $win, "darwin-aarch64": $mac, "darwin-x86_64": $mac,
+              "linux-x86_64": $appimage, "linux-x86_64-deb": $deb}}' > dist/latest.json
+          rm dist/*.sig
+          cat dist/latest.json
       - run: cd dist && sha256sum * > SHA256SUMS
       - name: terbitkan
         env:
@@ -140,6 +163,8 @@ jobs:
           | Windows 10/11 64-bit | `freedom-finger-desktop-windows-x64-setup.exe` |
           | Mac (Apple Silicon dan Intel) | `freedom-finger-desktop-macos.dmg` |
           | Linux 64-bit | `freedom-finger-desktop-linux-x64.deb` atau `.AppImage` |
+
+          Aplikasi desktop v0.4.0 ke atas memberi tahu sendiri bila ada versi baru (tombol di kiri bawah) dan memasangnya setelah disetujui.
 
           **Developer (SDK):** program server `freedom-finger` untuk dipasang sendiri (`freedom-finger install` = layanan 24 jam). Dokumentasi API: `docs/api.md`.
 

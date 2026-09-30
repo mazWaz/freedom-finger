@@ -2,9 +2,11 @@
 // log, restart), dan cari mesin di jaringan. Mesin mengambil perintah ±20 detik sampai 2 menit
 // kemudian, jadi setiap perintah tampil "menunggu mesin" sampai selesai. Perintah yang sedang berjalan
 // disimpan di aplikasi.json, sehingga tetap terlihat setelah aplikasi dibuka ulang.
+// Juga panduan pertama kali (guide): cari mesin, isian menu, tunggu terhubung, lalu ambil karyawan dan jam kerja.
 import { invoke } from '@tauri-apps/api/core';
 import { ask } from '@tauri-apps/plugin-dialog';
-import { $, api, call, data, devices, dmy, esc, notify, port, saveData, users, waiting } from './app.js';
+import { Check, createElement } from 'lucide';
+import { $, MACHINE_ICON, api, call, closeDrawer, data, devices, dmy, esc, loadDevices, notify, openDrawer, port, saveData, users, waiting } from './app.js';
 
 const ACTIONS = {
   set_time: { label: 'Setel jam sekarang', done: () => 'jam mesin sudah disetel' },
@@ -32,7 +34,18 @@ export function init() {
     const b = e.target.closest('button[data-cmd]');
     if (b) run(b.dataset.cmd, b.dataset.id);
   };
-  $('m-cari').onclick = search;
+  $('m-cari').onclick = () => search($('m-hasil'));
+  $('m-panduan').onclick = guide;
+  $('pd-cari').onclick = () => search($('pd-hasil'));
+  $('pd-ambil').onclick = () => {
+    closeDrawer();
+    $('tab-karyawan').click();
+    $('y-ambil').click();
+  };
+  $('pd-jam').onclick = () => {
+    closeDrawer();
+    $('tab-jam-kerja').click();
+  };
 }
 
 export async function show(reason) {
@@ -175,19 +188,51 @@ async function tick() {
   }
 }
 
-async function search() {
+async function search(out) {
   waiting('Mencari mesin di jaringan (sampai 10 detik)…');
   try {
     const found = await api('scan_devices');
-    $('m-hasil').innerHTML = found.length
-      ? '<table><thead><tr><th>IP</th><th>Mode</th><th>Cloud ID</th><th>Keterangan</th></tr></thead><tbody>' +
-        found.map((f) => `<tr><td>${esc(f.ip)}</td><td>${MODE[f.mode] ?? esc(f.mode)}</td><td>${esc(f.cloud_id ?? '')}</td><td>${esc(f.note)}</td></tr>`).join('') +
-        '</tbody></table>'
+    out.innerHTML = found.length
+      ? `<ul class="temuan">${found.map((f) => `<li><b>${esc(f.ip)}</b> · ${MODE[f.mode] ?? esc(f.mode)}${f.cloud_id ? ` · ${esc(f.cloud_id)}` : ''}` +
+        `<span class="muted">${esc(f.note)}</span></li>`).join('')}</ul>`
       : '<p class="muted">Tidak ada mesin ditemukan. Pastikan mesin menyala dan satu jaringan dengan komputer ini.</p>';
   } catch (e) {
-    $('m-hasil').innerHTML = '';
+    out.innerHTML = '';
     notify(`Gagal mencari mesin: ${e.message}`, true);
   } finally {
     waiting();
   }
+}
+
+// --- panduan pertama kali ------------------------------------------------------------------------
+
+let guideTimer;
+/** Panduan menghubungkan mesin: terbuka sendiri bila belum pernah ada mesin (main.js), atau dari tab Mesin. */
+export async function guide() {
+  const ip = (await invoke('lan_ip')) ?? 'IP komputer ini (lihat pengaturan jaringan)';
+  $('pd-isian').innerHTML = [['Mode', 'Internet'], ['Server IP', ip], ['Server Port', port], ['Server Req', 'Ya']]
+    .map(([k, v]) => `<dt>${k}</dt><dd><b>${esc(v)}</b></dd>`).join('');
+  $('pd-hasil').innerHTML = '';
+  guideStatus();
+  openDrawer('panduan', 'Hubungkan mesin absensi', 'Mesin muncul ±2 menit setelah menunya disimpan');
+  // server tidak mengirim event untuk mesin baru: tanya daftar mesin selama panduan terbuka
+  clearInterval(guideTimer);
+  guideTimer = setInterval(async () => {
+    if (!$('laci').open || $('panduan').hidden) return clearInterval(guideTimer);
+    await loadDevices().catch(() => {});
+    guideStatus();
+  }, 5000);
+}
+
+/** Langkah 3: menunggu (lingkaran berputar), atau centang begitu ada mesin terhubung. */
+function guideStatus() {
+  const on = devices.filter((d) => d.connected);
+  const off = devices.filter((d) => !d.connected);
+  $('pd-ikon').classList.toggle('selesai', on.length > 0);
+  $('pd-ikon').replaceChildren(createElement(on.length ? Check : MACHINE_ICON));
+  $('pd-status').innerHTML = on.length
+    ? `<b>${on.map((d) => esc(d.device_name || d.cloud_id)).join(', ')} terhubung.</b> Absen dari mesin kini masuk ke aplikasi ini.`
+    : off.length ? `Menunggu… ${off.map((d) => esc(d.device_name || d.cloud_id)).join(', ')} pernah terhubung, tetapi sekarang terputus.`
+      : 'Menunggu mesin menghubungi komputer ini…';
+  $('pd-ambil').disabled = !on.length;
 }

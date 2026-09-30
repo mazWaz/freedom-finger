@@ -144,7 +144,7 @@
       #status-samping::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
       #status-samping.ok { color: var(--hijau); } #status-samping.off { color: var(--merah); }
       .kaki button { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
-      .kaki svg { width: 16px; height: 16px; }
+      .kaki svg { width: 16px; height: 16px; } #pembaruan { margin-bottom: 8px; }
       main { overflow-y: auto; background: var(--muka); }
       /* lebar konten: tabel dan kartu melebar sampai 1600 px (layar 1080p sampai 4K); daftar hadir Riwayat
          memakai seluruh lebar supaya lebih banyak tanggal terlihat. Form tetap sempit (.sempit, .blok .isi). */
@@ -310,6 +310,7 @@
       .baris-jari { display: flex; gap: 8px; } .baris-jari select, .baris-jari.rata button { flex: 1; height: 38px; }
       .laci-isi h3 { margin: 8px 0 -6px; } td.kanan { text-align: right; }
       .hapus-karyawan { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--garis); } .hapus-karyawan p { margin: 8px 0 0; }
+      .hapus-karyawan .catatan { margin: 0 0 10px; } .hapus-karyawan input { flex: 1; min-width: 0; height: 38px; }
       .kred { display: flex; gap: 10px; align-items: center; justify-content: space-between; color: var(--redup); font-size: 13px; }
       .kred b { font-weight: 500; color: var(--tinta); }
       button.ikon { width: 30px; padding: 0; justify-content: center; color: var(--redup); } button.ikon svg { width: 18px; height: 18px; }
@@ -332,6 +333,19 @@
       #tunggu-teks { margin: 0; font-weight: 600; font-size: 15px; line-height: 1.45; }
       #tunggu-lama { margin: 0; font-variant-numeric: tabular-nums; }
       @media (prefers-reduced-motion: reduce) { .putar::before { animation-duration: 2.4s; } }
+      .langkah { list-style: none; counter-reset: langkah; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 22px; }
+      .langkah > li { counter-increment: langkah; position: relative; padding-left: 38px; }
+      .langkah > li::before {
+        content: counter(langkah); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%;
+        display: grid; place-items: center; background: var(--hijau-muda); color: var(--hijau); font-weight: 700; font-size: 13px;
+      }
+      .langkah > li > h3 { margin: 3px 0 8px; } .langkah p { margin: 0 0 10px; } .langkah .info-mesin { font-size: 15px; }
+      .pd-tunggu { display: flex; align-items: center; gap: 14px; } .pd-tunggu p { margin: 0; }
+      .pd-tunggu .putar { width: 44px; height: 44px; margin: 0; flex: none; } .pd-tunggu .putar svg { width: 20px; height: 20px; }
+      .putar.selesai::before { animation: none; border-color: var(--hijau); }
+      .temuan { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; max-width: 760px; }
+      .temuan li { border: 1px solid var(--garis); border-radius: 10px; padding: 10px 14px; font-size: 13.5px; }
+      .temuan .muted { display: block; margin-top: 4px; font-size: 13px; }
 
       /* --- tahap 2: komponen bersama tab laporan dan kelola -------------------------------- */
       .grup { display: inline-flex; }
@@ -595,6 +609,7 @@
           <button id="tab-pengaturan" aria-controls="pengaturan"><i data-lucide="settings"></i>Pengaturan</button>
         </nav>
         <div class="kaki">
+          <button id="pembaruan" class="utama" hidden><i data-lucide="download"></i><span></span></button>
           <button id="tombol-kunci"><i data-lucide="lock"></i>Kunci aplikasi</button>
         </div>
       </aside>
@@ -752,7 +767,7 @@
           <div id="m-daftar"></div>
           <h2>Cari mesin di jaringan</h2>
           <p class="muted">Mencari mesin di jaringan kantor lewat port 5005, beserta petunjuk isian menunya.</p>
-          <p><button id="m-cari">Cari mesin</button></p>
+          <div class="controls"><button id="m-cari">Cari mesin</button><button id="m-panduan">Panduan hubungkan mesin</button></div>
           <div id="m-hasil"></div>
         </section>
 
@@ -848,11 +863,29 @@
           <label class="bidang">Jadwal <select name="schedule"></select></label>
         </div>
         <label class="bidang">Nama lengkap <input name="name" maxlength="60" required autocomplete="off" /><small name="dimesin">Di mesin tertulis 15 huruf pertama</small></label>
-        <label class="bidang">Departemen <input name="dept" autocomplete="off" /></label>
+        <div class="baris">
+          <label class="bidang">Departemen <input name="dept" autocomplete="off" /></label>
+          <label class="bidang">Hak di mesin <select name="privilege"><option value="1">Karyawan</option><option value="2">Admin</option><option value="3">Subadmin</option></select></label>
+        </div>
         <p class="catatan info" role="status" hidden></p>
         <div class="laci-kaki"><button type="button" name="batal">Batal</button><button name="simpan" class="utama">Tambah ke mesin</button></div>
       </form>
       <div id="y-laci-daftar" class="laci-isi" hidden></div>
+      <div id="panduan" class="laci-isi" hidden>
+        <ol class="langkah">
+          <li><h3>Nyalakan mesin dan cari</h3>
+            <p class="muted">Mesin dan komputer ini harus tersambung ke jaringan kantor yang sama.</p>
+            <p><button type="button" id="pd-cari">Cari mesin</button></p><div id="pd-hasil"></div></li>
+          <li><h3>Isi menu mesin</h3>
+            <p class="muted">Di mesin buka <b>Menu → Jaringan</b>, isi persis seperti ini, lalu simpan:</p>
+            <dl id="pd-isian" class="info-mesin"></dl>
+            <p class="muted kecil">Minta admin jaringan mereservasi IP komputer ini di router. Bila IP-nya berubah, mesin tidak bisa mengirim absen ke sini.</p></li>
+          <li><h3>Tunggu mesin terhubung</h3>
+            <div class="pd-tunggu"><div id="pd-ikon" class="putar"></div><p id="pd-status" role="status"></p></div></li>
+          <li><h3>Mulai pakai</h3>
+            <div class="baris-jari rata"><button type="button" id="pd-ambil" class="utama">Ambil data karyawan</button><button type="button" id="pd-jam">Atur jam kerja</button></div></li>
+        </ol>
+      </div>
       <form id="i-koreksi" class="laci-isi" hidden>
         <label class="bidang">Karyawan <select name="pin" required></select></label>
         <div class="baris">

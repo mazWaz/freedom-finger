@@ -32,6 +32,9 @@ const credShort = (c) => [c.fingers.length && `${c.fingers.length} jari`, c.face
   .filter(Boolean).join(', ');
 /** User terbaru di server untuk PIN ini (nama dan hak akses di mesin), dari semua mesin. */
 const latestUser = (pin) => users.filter((u) => u.pin === pin).sort((a, b) => a.updated.localeCompare(b.updated)).at(-1);
+/** Mesin tempat PIN ini satu-satunya admin: tanpa admin, siapa pun bisa membuka menu mesin. */
+const soleAdmin = (pin) => users.filter((u) => u.pin === pin && u.privilege === '2' && !users.some((o) =>
+  o.cloud_id === u.cloud_id && o.pin !== pin && o.privilege === '2' && !isRemoved(o.pin))).map((u) => u.cloud_id);
 /**
  * Mesin terhubung yang punya PIN ini. Belum tercatat di mana pun (baru ditambah, belum mendaftar) = semua
  * mesin terhubung. Perintah untuk PIN yang tidak ada di mesin tidak dijawab (menunggu 5 menit).
@@ -85,6 +88,8 @@ export function init() {
   };
   pane.oninput = (e) => {
     if (e.target.name === 'dimesin') lettersLeft();
+    // hapus baru bisa setelah PIN diketik ulang
+    else if (e.target.name === 'konfirmasi') pane.querySelector('[name=hapus]').disabled = e.target.value.trim() !== enrollPin;
   };
   // akun uji dan sejenisnya: tidak tampil di Riwayat dan Rekap
   $('y-dihapus-daftar').onchange = (e) => {
@@ -208,8 +213,14 @@ async function add() {
     }
     for (const d of on) {
       waiting(`Menambahkan ${name} ke mesin…`);
-      ok(await command(d.cloud_id, 'set_userinfo', { data: { pin, name: shortName(name), privilege: '1' } }));
+      ok(await command(d.cloud_id, 'set_userinfo', { data: { pin, name: shortName(name), privilege: f.privilege.value } }));
+      // server baru mencatat hak aksesnya setelah membaca user ini; tanpa itu saklar Admin di laci tampil mati
+      if (f.privilege.value !== '1') {
+        waiting('Memeriksa hak akses di mesin…');
+        ok(await command(d.cloud_id, 'get_userinfo', { pin }));
+      }
     }
+    await loadUsers();
     data.employees[pin] = { name, dept: f.dept.value.trim(), recap: true, schedule: f.schedule.value || undefined, added: today() };
     await saveData('employees');
     notify(`${name} ditambahkan ke mesin dengan PIN ${pin}.`);
@@ -260,12 +271,17 @@ function renderEnroll() {
     '<button type="button" data-no="jari">Daftarkan jari</button></div>' +
     `<div class="baris-jari rata"><button type="button" data-no="${CARD}">${c.card ? 'Ganti kartu' : 'Daftarkan kartu'}</button>` +
     `<button type="button" data-no="${PASSWORD}">${c.password ? 'Ganti password' : 'Atur password'}</button></div></div>` +
-    '<div class="hapus-karyawan"><button type="button" name="hapus" class="bahaya">Hapus dari mesin</button>' +
+    '<div class="hapus-karyawan">' +
+    (soleAdmin(pin).length ? `<p class="catatan">${esc(nameOf(pin))} adalah admin terakhir di mesin. Bila dihapus, siapa pun bisa membuka menu mesin; ` +
+      'jadikan orang lain admin dulu.</p>' : '') +
+    `<div class="baris-jari"><input name="konfirmasi" inputmode="numeric" autocomplete="off" placeholder="Ketik PIN ${esc(pin)}" ` +
+    `aria-label="Ketik PIN ${esc(pin)} untuk menghapus"><button type="button" name="hapus" class="bahaya">Hapus dari mesin</button></div>` +
     '<p class="muted kecil">Orang ini tidak bisa absen lagi. Riwayat absennya tetap ada, dan cadangan jari/wajahnya tetap tersimpan di aplikasi, ' +
     'jadi bisa dipulihkan.</p></div>';
   lettersLeft();
   // selama menunggu mesin seluruh halaman terkunci (waiting); di sini cukup: tanpa mesin terhubung, tombol mati
   for (const el of $('y-laci-daftar').querySelectorAll('button, select, input')) el.disabled = !on.length;
+  $('y-laci-daftar').querySelector('[name=hapus]').disabled = true;
 }
 
 /** Sisa huruf nama di mesin (maksimal 15). */
@@ -293,6 +309,13 @@ async function saveMachine(pin) {
   const admin = pane.querySelector('[name=admin]').checked;
   if (!name) return tell(pin, 'Isi nama di mesin.', true);
   if (name === machineName(pin) && admin === (latestUser(pin)?.privilege === '2')) return tell(pin, 'Tidak ada yang berubah.');
+  if (!admin && soleAdmin(pin).length && !await ask(`${nameOf(pin)} adalah admin terakhir di mesin. Tanpa admin, siapa pun bisa membuka menu mesin: ` +
+    'menambah dan menghapus karyawan, mengubah pengaturan, dan menghapus data absen.\n\nTetap cabut hak admin?',
+  { title: 'Admin terakhir', kind: 'warning', okLabel: 'Cabut admin', cancelLabel: 'Batal' })) {
+    pane.querySelector('[name=admin]').checked = true;
+    return;
+  }
+  let fingers;
   try {
     for (const d of targets(pin)) {
       waiting('Mengambil data terbaru dari mesin (±20 detik sampai 2 menit)…');
@@ -308,11 +331,13 @@ async function saveMachine(pin) {
         throw new Error(`Data di mesin berubah sesudah disimpan: jari ${now.finger} → ${after?.finger}, wajah ${now.face} → ${after?.face}. ` +
           'Periksa di mesin; bila perlu daftarkan ulang.');
       }
+      fingers = now.finger;
     }
     await loadUsers();
     await refreshCreds(pin);
     if (pin === enrollPin) renderEnroll();
-    const text = `Nama di mesin untuk PIN ${pin}: ${name}${admin ? ', admin mesin' : ''}. Jari, wajah, kartu, dan password tidak berubah.`;
+    const text = `Nama di mesin untuk PIN ${pin}: ${name}${admin ? ', admin mesin' : ''}. Jari sebelum dan sesudah: ${fingers}; ` +
+      'wajah, kartu, dan password tidak berubah.';
     tell(pin, text);
     notify(text);
   } catch (e) {
@@ -324,11 +349,9 @@ async function saveMachine(pin) {
 
 // --- hapus dari mesin dan pulihkan ---------------------------------------------------------------
 
+/** Konfirmasinya PIN yang diketik ulang di laci (tombol mati sampai cocok). */
 async function remove(pin) {
   const name = nameOf(pin);
-  const yes = await ask(`Hapus ${name} (PIN ${pin}) dari mesin?\n\nJari dan wajahnya terhapus dari mesin, jadi dia tidak bisa absen lagi. ` +
-    'Riwayat absennya tetap ada di Riwayat dan Rekap.', { title: 'Hapus karyawan', kind: 'warning', okLabel: 'Hapus', cancelLabel: 'Batal' });
-  if (!yes) return;
   try {
     // hanya mesin yang punya data orang ini: DELETE_USER untuk PIN yang tidak ada tidak dijawab mesin
     for (const d of targets(pin)) {
