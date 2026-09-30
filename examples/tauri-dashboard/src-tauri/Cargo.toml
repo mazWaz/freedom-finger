@@ -1,6 +1,6 @@
 [package]
 name = "freedom-finger-tauri-dashboard"
-version = "0.2.0"
+version = "0.4.0"
 description = "Freedom Finger untuk pengguna akhir: server absensi dan dashboard realtime dalam satu aplikasi; juga contoh pemakaian SDK"
 edition = "2024"
 publish = false

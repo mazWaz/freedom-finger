@@ -1270,7 +1270,7 @@ dependencies = [
 
 [[package]]
 name = "freedom-finger"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -1300,7 +1300,7 @@ dependencies = [
 
 [[package]]
 name = "freedom-finger-tauri-dashboard"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "freedom-finger",
  "rust_xlsxwriter",
