@@ -50,7 +50,7 @@ function render() {
       const g = info[d.cloud_id];
       const waiting = data.commands.filter((c) => c.cloud_id === d.cloud_id);
       const buttons = Object.entries(ACTIONS)
-        .map(([type, a]) => `<button data-cmd="${type}" data-id="${esc(d.cloud_id)}"${!d.connected || waiting.some((c) => c.type === type) ? ' disabled' : ''}>${a.label}</button>`)
+        .map(([type, a]) => `<button data-cmd="${type}"${type === 'restart_device' ? ' class="bahaya"' : ''} data-id="${esc(d.cloud_id)}"${!d.connected || waiting.some((c) => c.type === type) ? ' disabled' : ''}>${a.label}</button>`)
         .join(' ');
       return `<h2>${esc(d.device_name || 'Mesin')} <span class="${d.connected ? 'ok' : 'off'}">${d.connected ? 'terhubung' : 'terputus'}</span></h2>` +
         '<table style="width: auto"><tbody>' +

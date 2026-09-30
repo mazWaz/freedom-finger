@@ -62,7 +62,7 @@ export function show() {
     s.dataset.opts = opts;
   }
   const buttons = (list, v) => ['ubah', 'hapus']
-    .map((b) => `<button name="${b}" data-id="${esc(v.id)}" aria-label="${b === 'ubah' ? 'Ubah' : 'Hapus'} ${esc(describe[list](v))}">${b === 'ubah' ? 'Ubah' : 'Hapus'}</button>`)
+    .map((b) => `<button name="${b}"${b === 'hapus' ? ' class="bahaya"' : ''} data-id="${esc(v.id)}" aria-label="${b === 'ubah' ? 'Ubah' : 'Hapus'} ${esc(describe[list](v))}">${b === 'ubah' ? 'Ubah' : 'Hapus'}</button>`)
     .join(' ');
   $('i-izin-daftar').innerHTML = [...data.leaves]
     .sort((a, b) => b.from.localeCompare(a.from))

@@ -109,7 +109,7 @@ export function show(reason = 'open') {
         `<td><input type="time" name="end" value="${d?.end ?? ''}"${dis} aria-label="${esc(l)} jam pulang"></td></tr>`;
     }).join('') + '</tbody></table>';
   const others = data.schedules.map((s) => `<div data-sched="${esc(s.id)}"><h3><label>Jadwal <input name="sname" value="${esc(s.name)}"></label> ` +
-    `<button data-hapus="${esc(s.id)}">Hapus jadwal</button></h3>${table(s.days, s.name)}</div>`);
+    `<button data-hapus="${esc(s.id)}" class="bahaya">Hapus jadwal</button></h3>${table(s.days, s.name)}</div>`);
   $('p-jadwal').innerHTML = `<div data-sched=""><h3>Utama${others.length ? ' <span class="muted">(karyawan yang tidak dipilih jadwal lain)</span>' : ''}</h3>` +
     `${table(data.schedule.days, 'Utama')}</div>${others.join('')}`;
   for (const [key, id] of Object.entries(NUMBERS)) $(id).value = data.schedule[key];
@@ -117,7 +117,7 @@ export function show(reason = 'open') {
   $('p-lembur').disabled = data.schedule.overtimeOn === false;
   $('p-libur').innerHTML = data.holidays
     .map((h) => `<tr><td>${dmy(h.date)}</td><td>${esc(h.note)}</td>` +
-      `<td><button data-date="${h.date}" aria-label="Hapus libur ${dmy(h.date)}">Hapus</button></td></tr>`)
+      `<td><button data-date="${h.date}" class="bahaya" aria-label="Hapus libur ${dmy(h.date)}">Hapus</button></td></tr>`)
     .join('') || '<tr><td colspan="3" class="muted">Belum ada hari libur. Libur nasional belum terisi otomatis.</td></tr>';
   renderBackup();
 }

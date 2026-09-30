@@ -10,7 +10,7 @@ rekap bulanan, izin dan koreksi absen, perawatan mesin, export Excel, backup) da
 
 | Tab | Isi |
 |---|---|
-| Hari ini | Absen hari ini secara realtime, status mesin, isian menu mesin |
+| Hari ini | Siapa yang sudah absen, terlambat, izin, atau belum absen; pita jam masuk; absen hari ini secara realtime; isian menu mesin |
 | Riwayat | Semua scan per rentang tanggal, termasuk koreksi manual (bertanda "Manual" dengan alasannya); cari nama atau PIN; pilih mesin; export Excel/CSV dan cetak |
 | Rekap | Per karyawan per bulan: hadir, terlambat, pulang cepat, lupa absen pulang, alpa, izin/sakit/cuti/dinas, jam kerja, lembur; klik untuk rincian per hari |
 | Izin & koreksi | Izin, sakit, cuti, dinas luar (satu hari atau rentang, dengan keterangan); koreksi absen untuk yang lupa scan (jam dan alasan wajib). Bisa diubah dan dihapus |
@@ -37,7 +37,8 @@ Aplikasi dirancang untuk PC yang hanya menyala di jam kantor, bukan server 24 ja
 | IP PC berubah | Peringatan bila mesin tidak lagi terhubung dan IP berbeda dari saat terakhir terhubung |
 | Firewall Windows | Installer (NSIS, butuh admin) membuka TCP 8013 untuk jaringan lokal; uninstall menutupnya |
 | Backup | Otomatis sekali sehari saat aplikasi pertama kali hidup, ke folder `Freedom Finger Backup` di folder pengguna (bukan Dokumen, yang sering disinkronkan OneDrive); 30 terakhir disimpan |
-| Pulihkan | Database diganti saat aplikasi mulai ulang; data sebelumnya disimpan sebagai `absensi-sebelum-pulih.db` di folder data |
+| Kata sandi | Dibuat saat aplikasi pertama kali dibuka; diminta setiap aplikasi dibuka, lewat tombol Kunci aplikasi, dan setelah jendela tersembunyi lebih dari 5 menit. Selama terkunci server tetap menerima absen. Lupa kata sandi: tutup aplikasi, hapus bagian `auth` di `aplikasi.json`, lalu buka lagi dan buat kata sandi baru |
+| Pulihkan | Database diganti saat aplikasi mulai ulang; kata sandi yang sekarang tetap dipakai; data sebelumnya disimpan sebagai `absensi-sebelum-pulih.db` di folder data |
 
 Data ada di folder data aplikasi, misalnya `%APPDATA%\io.github.mazwaz.freedom-finger-dashboard`
 di Windows: `absensi.db` milik server (log mesin, tidak pernah diubah aplikasi), `aplikasi.json`
@@ -73,6 +74,7 @@ mendaftarkan autostart. Installer dibuat oleh `.github/workflows/release.yml` (j
 | `src-tauri/src/main.rs` | Server tertanam, tray, autostart, satu instans; perintah untuk halaman: `aplikasi.json`, export .xlsx/CSV, backup, pulihkan, cetak |
 | `src/main.js` | Mulai: tunggu server, event realtime, `sync_attlog` saat start, backup otomatis, pindah tab |
 | `src/app.js` | Bersama: `fetch` ke API, `get_users` untuk nama, `aplikasi.json`, tanggal, export |
+| `src/kunci.js` | Layar kunci dan kata sandi (hash PBKDF2 lewat WebCrypto, disimpan di `aplikasi.json`) |
 | `src/hitung-rekap.js` | Aturan rekap, fungsi murni tanpa DOM; diuji `src/hitung-rekap.test.js` (`npm test`) |
 | `src/hari-ini.js`, `riwayat.js`, `rekap.js`, `izin.js`, `karyawan.js`, `mesin.js`, `pengaturan.js` | Satu modul per tab. `karyawan.js`: `get_all_pin` lalu `get_userinfo` per PIN baru, berlanjut walau aplikasi ditutup |
 | `src-tauri/windows/hooks.nsh` | Aturan firewall saat install dan uninstall di Windows |

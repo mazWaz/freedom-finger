@@ -3,10 +3,13 @@
 // dipakai bersama ada di app.js, dan aturan rekap di hitung-rekap.js.
 // PC tidak menyala 24 jam: saat start, semua log mesin ditarik (sync_attlog) untuk menyusul absen
 // selama PC mati, karena antrean kiriman mesin sendiri masuk pelan.
-import { $, api, bus, connect, devices, emit, listen, loadData, loadDevices, loadUsers } from './app.js';
+// Tampilan terkunci sampai kata sandi benar (kunci.js); tugas latar tetap berjalan.
+import '@fontsource-variable/plus-jakarta-sans';
+import { $, api, bus, connect, data, devices, emit, listen, loadData, loadDevices, loadUsers } from './app.js';
 import * as hariIni from './hari-ini.js';
 import * as izin from './izin.js';
 import * as karyawan from './karyawan.js';
+import * as kunci from './kunci.js';
 import * as mesin from './mesin.js';
 import * as pengaturan from './pengaturan.js';
 import * as rekap from './rekap.js';
@@ -19,12 +22,23 @@ function open(name) {
   active = name;
   for (const n of Object.keys(TABS)) {
     $(n).hidden = n !== name;
-    $(`tab-${n}`).setAttribute('aria-selected', String(n === name));
+    if (n === name) $(`tab-${n}`).setAttribute('aria-current', 'page');
+    else $(`tab-${n}`).removeAttribute('aria-current');
   }
   TABS[name].show('open');
 }
 
+/** Sidebar: nama kantor dan status mesin, terlihat dari semua tab. */
+function sidebar() {
+  $('nama-kantor').textContent = data.office;
+  const on = devices.filter((d) => d.connected).length;
+  $('status-samping').className = !devices.length ? 'redup' : on ? 'ok' : 'off';
+  $('status-samping').textContent = !devices.length ? 'Belum ada mesin' : on === devices.length
+    ? `${on === 1 ? 'Mesin' : `${on} mesin`} terhubung` : `${devices.length - on} dari ${devices.length} mesin terputus`;
+}
+
 async function main() {
+  kunci.init(() => open(active)); // setelah dibuka: gambar ulang tab supaya datanya terbaru
   await connect();
   await loadData();
   // server di dalam aplikasi baru saja dinyalakan: beri waktu sampai port-nya siap
@@ -44,6 +58,9 @@ async function main() {
   for (const type of ['logs', 'users', 'devices', 'data', 'employees']) {
     bus.addEventListener(type, () => TABS[active].show(type));
   }
+  bus.addEventListener('devices', sidebar);
+  bus.addEventListener('data', sidebar);
+  sidebar();
   listen((ev) => {
     if (ev.type === 'attlog' || ev.type === 'sync_attlog') emit('logs'); // absen baru, atau hasil penyusulan
     if (ev.type === 'get_userinfo') loadUsers();
@@ -51,6 +68,7 @@ async function main() {
     mesin.onEvent(ev);
   });
   open('hari-ini');
+  kunci.ready();
   // Susul absen selama PC mati; mesin mengambil perintah ini saat bertanya berikutnya (±20 detik–2 menit)
   for (const d of devices) api('sync_attlog', { cloud_id: d.cloud_id }).catch(() => {});
   karyawan.resumePull();
@@ -64,7 +82,9 @@ async function main() {
 }
 
 main().catch((e) => {
-  $('status-mesin').className = 'off';
-  $('status-mesin').textContent = `Gagal: ${e.message ?? e}. Mungkin port 8013 dipakai program lain (misalnya layanan ` +
+  const text = `Aplikasi gagal mulai: ${e.message ?? e}. Mungkin port 8013 dipakai program lain (misalnya layanan ` +
     'freedom-finger). Tutup program itu, lalu buka lagi aplikasi ini.';
+  $('status-mesin').className = 'off';
+  $('status-mesin').textContent = text;
+  kunci.failed(text);
 });

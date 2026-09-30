@@ -135,6 +135,7 @@ const defaults = () => ({
   backup: { folder: '', last: '' },
   pull: {}, // cloud_id -> ambil data karyawan yang sedang berjalan (karyawan.js)
   commands: [], // {trans, cloud_id, type, at}: perintah perawatan yang menunggu mesin (mesin.js)
+  auth: null, // kata sandi aplikasi {salt, iterations, hash} (kunci.js)
 });
 export const data = defaults();
 

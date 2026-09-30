@@ -226,16 +226,21 @@ fn stage_restore(p: &Paths, file: &Path) -> Res<()> {
 }
 
 fn stage_files(p: &Paths, file: &Path, staged_db: &Path, staged_json: &Path) -> Res<()> {
-    // aplikasi.json backup, dengan pengaturan backup PC ini (folder, backup terakhir): pengaturan lama
-    // membuat backup otomatis hari ini ditimpa isi yang baru dipulihkan
+    // aplikasi.json backup, dengan pengaturan backup PC ini (folder, backup terakhir) dan kata sandi yang
+    // sekarang: pengaturan lama membuat backup otomatis hari ini ditimpa isi yang baru dipulihkan, dan
+    // kata sandi lama mungkin sudah tidak diingat
     let date = file.file_name().and_then(|n| n.to_str()?.strip_prefix("freedom-finger-")?.strip_suffix(".db").map(str::to_owned));
     let json = date.map(|d| file.with_file_name(format!("aplikasi-{d}.json"))).filter(|j| j.exists());
     let json = match json {
         Some(j) => {
             let mut v: Value = serde_json::from_str(&fs::read_to_string(&j).map_err(err)?).map_err(|e| format!("{}: {e}", j.display()))?;
             let now: Option<Value> = fs::read_to_string(p.dir.join(DATA_FILE)).ok().and_then(|t| serde_json::from_str(&t).ok());
-            if let (Some(obj), Some(b)) = (v.as_object_mut(), now.as_ref().and_then(|n| n.get("backup"))) {
-                obj.insert("backup".into(), b.clone());
+            if let Some(obj) = v.as_object_mut() {
+                for key in ["backup", "auth"] {
+                    if let Some(x) = now.as_ref().and_then(|n| n.get(key)) {
+                        obj.insert(key.into(), x.clone());
+                    }
+                }
             }
             Some(serde_json::to_string_pretty(&v).map_err(err)?)
         }
@@ -418,7 +423,7 @@ mod tests {
         let dir = temp("pulih");
         let p = Paths { dir: dir.clone(), db: dir.join("absensi.db") };
         add_log(&p.db, "2026-09-29 08:00:00");
-        fs::write(dir.join(DATA_FILE), r#"{"office":"lama","backup":{"last":"2026-09-28 08:00"}}"#).unwrap();
+        fs::write(dir.join(DATA_FILE), r#"{"office":"lama","backup":{"last":"2026-09-28 08:00"},"auth":{"hash":"lama"}}"#).unwrap();
         let folder = dir.join("backup");
         // 31 backup lama: setelah backup baru, tinggal 30 tanggal terbaru
         fs::create_dir_all(&folder).unwrap();
@@ -432,14 +437,15 @@ mod tests {
 
         // data berubah sesudah backup, lalu dipulihkan
         add_log(&p.db, "2026-09-29 17:00:00");
-        fs::write(dir.join(DATA_FILE), r#"{"office":"baru","backup":{"last":"2026-09-29 09:00"}}"#).unwrap();
+        fs::write(dir.join(DATA_FILE), r#"{"office":"baru","backup":{"last":"2026-09-29 09:00"},"auth":{"hash":"baru"}}"#).unwrap();
         stage_restore(&p, &file).unwrap();
         assert_eq!(count(&p.db), 2); // belum dipasang sampai start berikutnya
         apply_restore(&p.dir, &p.db).unwrap();
         assert_eq!(count(&p.db), 1);
-        // isi dari backup, pengaturan backup dari PC ini
+        // isi dari backup, pengaturan backup dan kata sandi dari PC ini
         let restored: Value = serde_json::from_str(&fs::read_to_string(dir.join(DATA_FILE)).unwrap()).unwrap();
         assert_eq!((&restored["office"], &restored["backup"]["last"]), (&Value::from("lama"), &Value::from("2026-09-29 09:00")));
+        assert_eq!(restored["auth"]["hash"], "baru");
         assert_eq!(count(&dir.join("absensi-sebelum-pulih.db")), 2);
         apply_restore(&p.dir, &p.db).unwrap(); // tidak ada yang disiapkan: tidak berubah
         assert_eq!(count(&p.db), 1);

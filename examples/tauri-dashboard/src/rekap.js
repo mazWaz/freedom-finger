@@ -113,6 +113,7 @@ function render() {
     `Jam kerja ${data.schedules.length ? [{ name: 'Utama', days: s.days }, ...data.schedules].map((x) => `${x.name} ${scheduleText(x.days)}`).join('; ') : scheduleText(s.days)}` +
     `; toleransi terlambat ${s.tolerance} menit; lembur ${s.overtimeOn === false ? 'tidak dihitung' : `mulai ${s.overtimeMin} menit`}. Ubah di Pengaturan.`;
   $('rekap').classList.toggle('tanpa-lembur', s.overtimeOn === false);
+  $('rekap').classList.toggle('tanpa-dept', !result.some((x) => deptOf(x.pin)));
   const r = detail && result.find((x) => x.pin === detail);
   if (detail && !r) detail = null;
   $('k-ringkasan').hidden = !!r;
@@ -120,9 +121,9 @@ function render() {
   if (!r) {
     $('k-daftar').innerHTML = result
       .map(({ pin, total: t }) => `<tr data-pin="${esc(pin)}" tabindex="0" class="klik" title="Lihat rincian per hari">` +
-        `<td>${esc(nameOf(pin))}</td><td>${esc(deptOf(pin))}</td><td class="num">${t.workDays}</td><td class="num">${t.present}</td>` +
-        `<td class="num">${times(t.late, t.lateMin)}</td><td class="num">${times(t.early, t.earlyMin)}</td>` +
-        `<td class="num">${t.noOut || ''}</td><td class="num">${t.absent || ''}</td><td class="num" title="${LEAVE_KINDS.filter((k) => t[k]).map((k) => `${LABEL[k]} ${t[k]}`).join(' · ')}">${leaveDays(t) || ''}</td>` +
+        `<td>${esc(nameOf(pin))}</td><td class="dept">${esc(deptOf(pin))}</td><td class="num">${t.workDays}</td><td class="num">${t.present}</td>` +
+        `<td class="num${t.late ? ' merah' : ''}">${times(t.late, t.lateMin)}</td><td class="num">${times(t.early, t.earlyMin)}</td>` +
+        `<td class="num">${t.noOut || ''}</td><td class="num${t.absent ? ' merah' : ''}">${t.absent || ''}</td><td class="num" title="${LEAVE_KINDS.filter((k) => t[k]).map((k) => `${LABEL[k]} ${t[k]}`).join(' · ')}">${leaveDays(t) || ''}</td>` +
         `<td class="num">${duration(t.hours)}</td><td class="num lembur">${duration(t.overtime)}</td></tr>`)
       .join('') || '<tr><td colspan="11" class="muted">Belum ada karyawan. Ambil data karyawan di tab Karyawan.</td></tr>';
     return;
@@ -130,7 +131,7 @@ function render() {
   $('k-nama').textContent = `${nameOf(r.pin)} · PIN ${r.pin}${data.schedules.length ? ` · jadwal ${scheduleName(r.pin)}` : ''}`;
   $('k-hari').innerHTML = r.days
     .map((d) => `<tr class="${d.status}"><td>${dayName(d.date).slice(0, 3)}, ${dmy(d.date)}</td><td>${hhmm(d.in)}</td><td>${hhmm(d.out)}</td>` +
-      `<td>${LABEL[d.status]}</td><td class="num">${d.late || ''}</td><td class="num">${d.early || ''}</td>` +
+      `<td>${LABEL[d.status]}</td><td class="num${d.late ? ' merah' : ''}">${d.late || ''}</td><td class="num">${d.early || ''}</td>` +
       `<td class="num">${duration(d.hours)}</td><td class="num lembur">${duration(d.overtime)}</td><td>${esc(note(d, r.pin))}</td></tr>`)
     .join('');
 }
