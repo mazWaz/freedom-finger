@@ -18,7 +18,7 @@ export function DaftarScan({ rows, fresh }: { rows: Scan[]; fresh: { keys: Set<s
   const [page, setPage] = useState(1);
   const q = search.trim().toLowerCase();
   const found = rows.filter((l) => !q || l.pin.includes(q) || app.nameOf(l.pin).toLowerCase().includes(q));
-  const roles = scanRoles(rows, app.data.schedule.minGap);
+  const roles = scanRoles(rows, app.minGapOf);
   const [list, n] = pageOf(found, page, PER_PAGE);
   return (
     <details className="lipat">

@@ -7,7 +7,8 @@ import { useApp } from '@/components/aplikasi';
 import { dayName, longDate } from '@/lib/format';
 import { lateText, shortDate, type Sheet } from './tabel';
 
-export function Matriks({ sheet, range, q }: { sheet: Sheet; range: string; q: string }) {
+/** `onCell(pin, tanggal)` = klik sel: koreksi absen untuk orang dan tanggal itu. */
+export function Matriks({ sheet, range, q, onCell }: { sheet: Sheet; range: string; q: string; onCell: (pin: string, date: string) => void }) {
   const app = useApp();
   const { pins, dates, now, cell: at } = sheet;
   const box = useRef<HTMLDivElement>(null);
@@ -58,7 +59,13 @@ export function Matriks({ sheet, range, q }: { sheet: Sheet; range: string; q: s
                       const c = at(pin, date);
                       const outCls = [c.out === '?' && 'tanpa', c.early && 'cepat', c.manualOut && 'manual'].filter(Boolean).join(' ');
                       return (
-                        <td key={date} className={c.kind || undefined} title={`${name}, ${dayName(date)} ${longDate(date)}: ${c.about}`}>
+                        <td
+                          key={date}
+                          className={c.kind || undefined}
+                          data-date={date}
+                          title={`${name}, ${dayName(date)} ${longDate(date)}: ${c.about}. Klik untuk koreksi absen`}
+                          onClick={() => onCell(pin, date)}
+                        >
                           {c.in ? (
                             <>
                               <b className={c.manualIn ? 'manual' : undefined}>

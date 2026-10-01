@@ -2,7 +2,7 @@
 // bagian, jadwal, ikut rekap. Isian aplikasi menang atas nama di mesin.
 import { invoke } from '@tauri-apps/api/core';
 import { emit, machineName, users } from './api.js';
-import { DEFAULT_SCHEDULE } from './hitung-rekap.js';
+import { DEFAULT_SCHEDULE, weekday } from './hitung-rekap.js';
 import { esc, notify } from './ui.js';
 
 const defaults = () => ({
@@ -54,6 +54,9 @@ export const inRecap = (pin) => data.employees[pin]?.recap !== false;
 /** Jadwal lain yang dipilih untuk karyawan ini; `undefined` = jadwal utama. */
 export const scheduleOf = (pin) => data.schedules.find((s) => s.id === data.employees[pin]?.schedule);
 export const scheduleName = (pin) => scheduleOf(pin)?.name ?? 'Utama';
+/** Jarak minimal masuk–pulang (menit) untuk PIN ini di tanggal ini; hari jam bebas 0: scan kedua sudah pulang. */
+export const minGapOf = (pin, date) =>
+  !data.holidays.some((h) => h.date === date) && (scheduleOf(pin) ?? data.schedule).days[weekday(date)]?.free ? 0 : data.schedule.minGap;
 /** Warna bawaan jadwal lain, jauh dari warna status (hijau tepat waktu, merah terlambat, biru izin). */
 export const SCHEDULE_COLORS = ['#7c3aed', '#d97706', '#db2777', '#0d9488', '#4f46e5', '#92400e'];
 /** Warna satu jadwal ("#rrggbb"); jadwal utama bawaan abu-abu biru. Dicek karena masuk ke atribut style. */

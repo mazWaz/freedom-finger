@@ -32,7 +32,7 @@ export const matches = (app: App, q: string) => (pin: string) => !q || pin.inclu
  * mesin sendiri menurut jam. Satu mesin dipilih: dihitung dari scan mesin itu saja.
  */
 export function rolesOf(app: App, list: Scan[]) {
-  const roles = scanRoles(list, app.data.schedule.minGap);
+  const roles = scanRoles(list, app.minGapOf);
   return (l: Scan) => roles.get(`${l.pin} ${l.scan_date}`) ?? '';
 }
 export const verify = (l: Scan) => (l.manual ? 'Manual' : (VERIFY[String(l.verify)] ?? String(l.verify)));

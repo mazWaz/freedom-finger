@@ -1,7 +1,8 @@
 // Rekap absensi: fungsi murni tanpa DOM atau API, supaya bisa diuji (rekap.test.ts) dan dipakai
 // aplikasi lain. Aturannya sama dengan PRD Feature 7, bagian Recap rules:
 // - tombol Masuk/Pulang di mesin diabaikan; scan pertama hari itu = masuk
-// - scan terakhir = pulang, bila berjarak minimal `minGap` menit dari masuk (lebih dekat = scan ganda)
+// - scan terakhir = pulang, bila berjarak minimal `minGap` menit dari masuk (lebih dekat = scan ganda);
+//   hari jam bebas: scan terakhir selalu pulang, berapa pun jaraknya
 // - menit terlambat dihitung dari jam masuk, bukan dari akhir toleransi
 // - hari ini dan sesudahnya belum dihitung
 // Semua jam dalam menit sejak 00:00; detik diabaikan.
@@ -58,10 +59,11 @@ export const correctionScans = (corrections: Correction[], from: string, to: str
 /**
  * Arti tiap scan menurut aturan rekap, bukan tombol Masuk/Pulang di mesin (mesin mengganti tombol sendiri
  * menurut jam, mis. semua scan sebelum 09:00 tercatat "Pulang"): scan pertama per orang per hari = Masuk,
- * scan terakhir = Pulang bila minimal `minGap` menit sesudahnya, sisanya tidak dihitung.
+ * scan terakhir = Pulang bila minimal `gapOf(pin, tanggal)` menit sesudahnya (`minGap`; jam bebas 0),
+ * sisanya tidak dihitung.
  * Hasil: "PIN YYYY-MM-DD hh:mm:ss" -> 'Masuk' | 'Pulang'.
  */
-export function scanRoles(scans: Scan[], minGap: number) {
+export function scanRoles(scans: Scan[], gapOf: (pin: string, date: string) => number) {
   const perDay = new Map<string, string[]>();
   for (const s of scans) {
     const k = `${s.pin} ${s.scan_date.slice(0, 10)}`;
@@ -72,7 +74,8 @@ export function scanRoles(scans: Scan[], minGap: number) {
     const pin = k.slice(0, k.indexOf(' '));
     list.sort();
     roles.set(`${pin} ${list[0]}`, 'Masuk');
-    if (minutes(list.at(-1)!, 11) - minutes(list[0], 11) >= minGap) roles.set(`${pin} ${list.at(-1)}`, 'Pulang');
+    const gap = gapOf(pin, list[0].slice(0, 10));
+    if (list.length > 1 && minutes(list.at(-1)!, 11) - minutes(list[0], 11) >= gap) roles.set(`${pin} ${list.at(-1)}`, 'Pulang');
   }
   return roles;
 }
@@ -174,7 +177,8 @@ export function recap({ scans, pins, schedule, holidays = [], leaves = [], from,
 function day(date: string, scans: number[], shift: Shift | null, s: Schedule, leave?: LeaveKind, holiday?: string): RecapDay {
   const t = [...scans].sort((a, b) => a - b);
   const first = t[0];
-  const out = t.length > 1 && t.at(-1)! - first >= s.minGap ? t.at(-1)! : null;
+  const gap = shift?.free ? 0 : s.minGap; // jam bebas: scan kedua sudah pulang
+  const out = t.length > 1 && t.at(-1)! - first >= gap ? t.at(-1)! : null;
   const ot = s.overtime?.[weekday(date)] !== false; // tanggal libur kantor ikut sakelar hari itu
   const d: RecapDay = { date, work: !!shift, in: first ?? null, out, status: 'hadir', late: 0, early: 0, noOut: false, hours: 0, overtime: 0, note: holiday ?? '' };
   if (first !== undefined && out !== null) d.hours = out - first;

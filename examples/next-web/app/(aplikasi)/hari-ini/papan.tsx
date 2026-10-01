@@ -4,7 +4,7 @@
 import { useState, type ReactNode } from 'react';
 import { useApp } from '@/components/aplikasi';
 import { Halaman, pageOf } from '@/components/halaman';
-import { LABEL, hhmm } from '@/lib/format';
+import { LABEL, hhmm, today } from '@/lib/format';
 import type { Holiday } from '@/lib/types';
 import { JadwalTag, KIND, ORDER, lateBy, out, type Kind, type Person } from './orang';
 
@@ -78,7 +78,7 @@ export function Papan({ people, holiday, fresh, onOpen }: Props) {
 function Kartu({ p, fresh, onOpen }: { p: Person; fresh: boolean; onOpen: (pin: string) => void }) {
   const app = useApp();
   const first = p.scans[0];
-  const home = out(p, app.data.schedule.minGap);
+  const home = out(p, app.minGapOf(p.pin, today()));
   const free = !!p.shift?.free;
   const [jam, status] = {
     telat: () => [hhmm(first.m), `terlambat ${lateBy(p)} mnt`],

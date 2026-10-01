@@ -1,6 +1,6 @@
 // Data milik aplikasi (aplikasi.json di server web) dan karyawan: nama, bagian, jadwal, ikut rekap.
 // Isian aplikasi menang atas nama di mesin. Fungsi murni; state-nya di components/aplikasi.tsx.
-import { DEFAULT_SCHEDULE } from './rekap';
+import { DEFAULT_SCHEDULE, weekday } from './rekap';
 import type { AppData, MachineUser, OtherSchedule, Schedule } from './types';
 
 export const defaults = (): AppData => ({
@@ -66,6 +66,9 @@ export function people(data: AppData, users: MachineUser[]) {
     /** Jadwal lain yang dipilih untuk karyawan ini; `undefined` = jadwal utama. */
     scheduleOf,
     scheduleName: (pin: string) => scheduleOf(pin)?.name ?? 'Utama',
+    /** Jarak minimal masuk–pulang (menit) untuk PIN ini di tanggal ini; hari jam bebas 0: scan kedua sudah pulang. */
+    minGapOf: (pin: string, date: string) =>
+      !data.holidays.some((h) => h.date === date) && (scheduleOf(pin) ?? data.schedule).days[weekday(date)]?.free ? 0 : data.schedule.minGap,
     isRemoved,
     usedPins,
     /** Semua karyawan: dari mesin dan dari isian aplikasi, kecuali yang dihapus dari mesin. */

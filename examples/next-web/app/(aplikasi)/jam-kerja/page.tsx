@@ -11,7 +11,7 @@ import { Jadwal } from './jadwal';
 
 const RULES = [
   ['tolerance', 'Toleransi terlambat', 'menit', 'Menit terlambat tetap dihitung dari jam masuk. Contoh: masuk 08:00, toleransi 15, scan 08:20 = terlambat 20 menit.'],
-  ['minGap', 'Scan kedua dihitung pulang bila minimal', 'menit setelah masuk', 'Scan yang lebih dekat dianggap scan ganda.'],
+  ['minGap', 'Scan kedua dihitung pulang bila minimal', 'menit setelah masuk', 'Scan yang lebih dekat dianggap scan ganda. Hari jam bebas: scan terakhir selalu pulang.'],
   ['overtimeMin', 'Lembur dihitung mulai', 'menit setelah jam pulang', 'Lembur di bawah batas ini dihitung 0. Hari yang dihitung lembur diatur per hari di jadwal.'],
 ] as const;
 

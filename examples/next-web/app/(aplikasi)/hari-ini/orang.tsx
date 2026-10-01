@@ -38,7 +38,7 @@ export function buildPeople(app: App, list: Scan[], day: string) {
   return { people, holiday };
 }
 
-/** Jam pulang: scan terakhir, bila cukup jauh dari scan pertama (lebih dekat = scan ganda). */
+/** Jam pulang: scan terakhir, bila cukup jauh dari scan pertama (lebih dekat = scan ganda; jam bebas: `minGap` 0). */
 export const out = (p: Person, minGap: number) => (p.scans.length > 1 && p.scans.at(-1)!.m - p.scans[0].m >= minGap ? p.scans.at(-1)! : null);
 export const lateBy = (p: Person) => p.scans[0].m - (p.shift && !p.shift.free ? minutes(p.shift.start) : 0);
 

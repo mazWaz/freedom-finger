@@ -3,9 +3,11 @@
 // - Per hari (bawaan): daftar hadir (matriks.tsx), berwarna menurut hitungan yang sama dengan Rekap.
 // - Semua scan (log.tsx): tiap scan dikelompokkan per hari, bisa dipilih per mesin.
 // Koreksi absen (menu Izin & koreksi) ikut dihitung dan bertanda "manual", kecuali saat satu mesin dipilih.
+// Klik sel daftar hadir = form koreksi untuk orang dan tanggal itu (lupa absen masuk atau pulang).
 import { FileSpreadsheet, FileText, Printer } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '@/components/aplikasi';
+import { useCatatan } from '@/components/form-catatan';
 import { PilihRentang } from '@/components/tanggal';
 import { useUi } from '@/components/ui';
 import { exportCsv, exportXlsx, reportTitle } from '@/lib/export';
@@ -19,6 +21,7 @@ import { logTable, matches, sheet, sheetTable } from './tabel';
 export default function Riwayat() {
   const app = useApp();
   const { notify } = useUi();
+  const catatan = useCatatan();
   const [[from, to], setRange] = useState(() => ranges()['Bulan ini']);
   const [q, setQ] = useState('');
   const [view, setView] = useState<'hari' | 'scan'>('hari'); // 'hari' = daftar hadir per hari, 'scan' = semua scan
@@ -121,7 +124,12 @@ export default function Riwayat() {
         </span>
       </div>
       <p className="print-title" id="r-judul">{reportTitle(app.data.office, 'Riwayat absen', from, to)}</p>
-      {grid ? <Matriks sheet={grid} range={loaded} q={q.trim()} /> : <Log every={every} list={list} page={page} onPage={setPage} />}
+      {grid ? (
+        <Matriks sheet={grid} range={loaded} q={q.trim()} onCell={(pin, date) => catatan.open('corrections', { pin, date })} />
+      ) : (
+        <Log every={every} list={list} page={page} onPage={setPage} />
+      )}
+      {catatan.laci}
     </section>
   );
 }

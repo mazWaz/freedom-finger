@@ -3,14 +3,16 @@
 //   berwarna menurut hitungan yang sama dengan Rekap (recapAll): terlambat, izin/sakit/cuti/dinas, tidak
 //   masuk, libur. Hari ini ikut tampil; yang belum scan hari ini belum dianggap tidak masuk.
 // - Semua scan: tiap scan dikelompokkan per hari, bisa dipilih per mesin.
-// Koreksi absen (izin.js) ikut dihitung dan bertanda "manual", kecuali saat satu mesin dipilih.
+// Koreksi absen (izin.js) ikut dihitung dan bertanda "manual", kecuali saat satu mesin dipilih. Klik sel daftar
+// hadir = form koreksi untuk orang dan tanggal itu (lupa absen masuk atau pulang).
 import { devices, logs } from '../lib/api.js';
-import { data, inRecap, knownPins, nameOf } from '../lib/data.js';
+import { data, inRecap, knownPins, minGapOf, nameOf } from '../lib/data.js';
 import { exportCsv, exportXlsx, print, reportTitle } from '../lib/export.js';
 import { dayName, hhmm, longDate, monthName, ranges, today } from '../lib/format.js';
 import { LEAVE_KINDS, addDays, correctionScans, minutes, scanRoles } from '../lib/hitung-rekap.js';
 import { $, esc, paginate } from '../lib/ui.js';
 import { VERIFY } from './hari-ini.js';
+import { openForm } from './izin.js';
 import { LABEL, recapAll } from './rekap.js';
 
 let rows = []; // hasil get_attlog untuk rentang terpilih, terbaru dulu
@@ -26,6 +28,10 @@ export function init() {
   [$('r-dari').value, $('r-sampai').value] = ranges()['Bulan ini'];
   $('r-dari').onchange = () => show('open'); // rentang (tanggal.js): sekali, di input dari
   $('r-mesin').onchange = () => show('open');
+  $('r-baris').onclick = (e) => {
+    const td = e.target.closest('td[data-date]');
+    if (td) openForm('corrections', { pin: td.parentElement.dataset.pin, date: td.dataset.date });
+  };
   $('r-cari').oninput = () => {
     page = 1;
     render();
@@ -87,7 +93,7 @@ function visible(list = all()) {
  * mesin sendiri menurut jam. Satu mesin dipilih: dihitung dari scan mesin itu saja.
  */
 const rolesOf = (list) => {
-  const roles = scanRoles(list, data.schedule.minGap);
+  const roles = scanRoles(list, minGapOf);
   return (l) => roles.get(`${l.pin} ${l.scan_date}`) ?? '';
 };
 const verify = (l) => (l.manual ? 'Manual' : (VERIFY[l.verify] ?? String(l.verify)));
@@ -207,10 +213,10 @@ function renderSheet() {
     return `<th scope="col"${cls ? ` class="${cls}"` : ''} title="${dayName(date)} ${longDate(date)}${note ? `, ${esc(note)}` : ''}">` +
       `<b>${dayName(date).slice(0, 3)}</b>${shortDate(date)}</th>`;
   }).join('')}</tr>`;
-  $('r-baris').innerHTML = pins.map((pin) => `<tr><th scope="row" title="${esc(nameOf(pin))}, PIN ${esc(pin)}">${esc(nameOf(pin))}</th>` +
+  $('r-baris').innerHTML = pins.map((pin) => `<tr data-pin="${esc(pin)}"><th scope="row" title="${esc(nameOf(pin))}, PIN ${esc(pin)}">${esc(nameOf(pin))}</th>` +
     dates.map((date) => {
       const c = at(pin, date);
-      return `<td class="${c.kind}" title="${esc(nameOf(pin))}, ${dayName(date)} ${longDate(date)}: ${esc(c.about)}">` +
+      return `<td class="${c.kind}" data-date="${date}" title="${esc(nameOf(pin))}, ${dayName(date)} ${longDate(date)}: ${esc(c.about)}. Klik untuk koreksi absen">` +
         (c.in
           ? `<b${c.manualIn ? ' class="manual"' : ''}>${c.in}${c.late ? `<small>${lateText(c.late)}</small><span class="sr-only"> terlambat</span>` : ''}</b>` +
             `<span class="${[c.out === '?' && 'tanpa', c.early && 'cepat', c.manualOut && 'manual'].filter(Boolean).join(' ')}">${c.out}` +

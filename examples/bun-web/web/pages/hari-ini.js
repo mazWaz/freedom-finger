@@ -5,7 +5,7 @@
 // Koreksi absen hari ini ikut dihitung seperti scan, sama dengan Rekap.
 import { FingerprintPattern, createElement } from 'lucide';
 import { backups, devices, logs, port, serverIp } from '../lib/api.js';
-import { colorOf, data, deptOf, inRecap, knownPins, nameOf, scheduleName, scheduleOf, scheduleTag } from '../lib/data.js';
+import { colorOf, data, deptOf, inRecap, knownPins, minGapOf, nameOf, scheduleName, scheduleOf, scheduleTag } from '../lib/data.js';
 import { dayName, hhmm, monthName, period, today } from '../lib/format.js';
 import { correctionScans, minutes, scanRoles, userPhoto, weekday } from '../lib/hitung-rekap.js';
 import { $, esc, openDrawer, paginate } from '../lib/ui.js';
@@ -96,7 +96,7 @@ export async function show() {
 function table() {
   const q = $('daftar-cari').value.trim().toLowerCase();
   const found = rows.filter((l) => matches(l.pin, q));
-  const roles = scanRoles(rows, data.schedule.minGap); // bukan tombol mesin: sebelum 09:00 mesin selalu mencatat "Pulang"
+  const roles = scanRoles(rows, minGapOf); // bukan tombol mesin: sebelum 09:00 mesin selalu mencatat "Pulang"
   $('jumlah').textContent = rows.length ? `(${rows.length})` : '';
   const [list, n] = paginate($('daftar-hal'), found, page.rows, PER_PAGE.rows, (n) => {
     page.rows = n;
@@ -163,8 +163,8 @@ function render(fresh) {
       : knownPins().length ? '' : '<p class="kosong">Belum ada data karyawan. Ambil dari mesin di tab Karyawan.</p>');
 }
 
-/** Jam pulang: scan terakhir, bila cukup jauh dari scan pertama (lebih dekat = scan ganda). */
-const out = (p) => (p.scans.length > 1 && p.scans.at(-1).m - p.scans[0].m >= data.schedule.minGap ? p.scans.at(-1) : null);
+/** Jam pulang: scan terakhir, bila cukup jauh dari scan pertama (lebih dekat = scan ganda; jam bebas: berapa pun). */
+const out = (p) => (p.scans.length > 1 && p.scans.at(-1).m - p.scans[0].m >= minGapOf(p.pin, today()) ? p.scans.at(-1) : null);
 const lateBy = (p) => p.scans[0].m - minutes(p.shift.start);
 
 function card(p, fresh) {

@@ -146,7 +146,7 @@ test('arti scan menurut aturan rekap, bukan tombol mesin: datang 07:59 = Masuk',
     { pin: '6', scan_date: '2026-09-30 10:05:00' }, // scan ganda: tidak dihitung
     { pin: '5', scan_date: '2026-09-30 10:00:00' },
     { pin: '5', scan_date: '2026-09-30 10:30:00' }, // kurang dari jarak minimal: bukan pulang
-  ], 60);
+  ], () => 60);
   assert.equal(r.get('8 2026-09-30 07:59:23'), 'Masuk');
   assert.equal(r.get('6 2026-09-30 10:04:00'), 'Masuk');
   assert.equal(r.get('6 2026-09-30 10:05:00'), undefined);
@@ -199,4 +199,17 @@ test('jam bebas: hadir bila scan, tanpa scan = alpa; tidak ada terlambat, pulang
   assert.deepEqual([d.status, d.late, d.early, d.overtime, d.hours, d.noOut], ['hadir', 0, 0, 0, hm(11, 20), false]);
   assert.equal(day(['13:00'], { schedule }).noOut, true);
   assert.equal(day([], { schedule }).status, 'alpa');
+});
+
+test('jam bebas: scan kedua sudah pulang walau dekat; satu scan tetap tanpa pulang', () => {
+  const schedule = { ...DEFAULT_SCHEDULE, days: Array(7).fill({ free: true }) };
+  const d = day(['13:15', '13:19', '14:21'], { schedule });
+  assert.deepEqual([d.in, d.out, d.hours, d.noOut], [hm(13, 15), hm(14, 21), 66, false]);
+  assert.equal(day(['16:50', '17:10'], { schedule }).out, hm(17, 10)); // 20 menit: hari biasa = scan ganda
+  assert.equal(day(['16:50', '17:10']).out, null);
+  assert.equal(day(['16:50'], { schedule }).noOut, true);
+  const r = scanRoles([{ pin: '2', scan_date: '2026-09-30 16:50:14' }, { pin: '2', scan_date: '2026-09-30 17:10:00' },
+    { pin: '3', scan_date: '2026-09-30 16:50:00' }], () => 0);
+  assert.equal(r.get('2 2026-09-30 17:10:00'), 'Pulang');
+  assert.equal(r.get('3 2026-09-30 16:50:00'), 'Masuk'); // satu scan: tetap Masuk walau jarak minimal 0
 });

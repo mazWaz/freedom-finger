@@ -1,7 +1,7 @@
 'use client';
 // Form izin (izin, sakit, cuti, dinas luar) dan koreksi absen di laci. Keduanya hanya disimpan di
 // aplikasi.json; log mesin tidak pernah diubah, supaya data asli mesin tetap utuh sebagai bukti.
-// Dibuka dari menu Izin & koreksi, kartu karyawan di Hari ini, dan rincian Rekap, sudah terisi nama
+// Dibuka dari menu Izin & koreksi, kartu karyawan di Hari ini, rincian Rekap, dan sel Riwayat, sudah terisi nama
 // dan tanggal: `const catatan = useCatatan()`, lalu `catatan.open(...)` dan `{catatan.laci}`.
 import { useState, type FormEvent } from 'react';
 import { byPin } from '@/lib/data';
