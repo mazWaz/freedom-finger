@@ -101,6 +101,9 @@ export function Matriks({ sheet, range, q }: { sheet: Sheet; range: string; q: s
         </span>
         <i className="libur"></i>libur
         <span>
+          <b>17:30</b> pulang cepat
+        </span>
+        <span>
           <b>?</b> tanpa pulang
         </span>
         <span>
