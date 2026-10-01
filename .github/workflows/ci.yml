@@ -84,3 +84,16 @@ jobs:
       # aturan rekap (hitung-rekap.js), tanpa dependency npm
       - run: npm test
         working-directory: examples/tauri-dashboard
+
+  # Contoh web (Bun): uji server web dengan server Freedom Finger tiruan, aturan rekap, dan tipe TypeScript.
+  bun-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/bun-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - run: bun run check

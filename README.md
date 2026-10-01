@@ -161,6 +161,7 @@ curl -s http://localhost:8013/api/get_attlog -H "Authorization: Bearer $TOKEN" \
 | [`docs/api.md`](docs/api.md) | Semua endpoint, contoh request dan balasan, event realtime, contoh JavaScript tanpa pustaka |
 | [`docs/openapi.yaml`](docs/openapi.yaml) | Spesifikasi OpenAPI 3.1, untuk Swagger UI atau generator klien |
 | [`examples/tauri-dashboard`](examples/tauri-dashboard) | Kode aplikasi desktop: contoh menanam server di aplikasi Rust dan memakai API-nya |
+| [`examples/bun-web`](examples/bun-web) | Aplikasi yang sama sebagai halaman web dengan login user, servernya Bun: contoh memakai API dari server lain |
 
 ## Commands
 
@@ -177,6 +178,7 @@ curl -s http://localhost:8013/api/get_attlog -H "Authorization: Bearer $TOKEN" \
 | `crates/freedom-finger` | Program dan library server: menerima data mesin, API bergaya developer.fingerspot.io, SQLite |
 | `crates/freedom-finger-sdk` | SDK: protokol FkWeb (mode Internet), tanpa I/O |
 | `examples/tauri-dashboard` | Aplikasi desktop untuk pengguna, sekaligus contoh dan demo: server tertanam, riwayat, rekap, export, backup |
+| `examples/bun-web` | Versi web untuk server kantor yang menyala terus: tampilan sama dengan desktop, login user dan kata sandi |
 
 ## Build and test
 

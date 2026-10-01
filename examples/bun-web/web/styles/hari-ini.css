@@ -1,0 +1,117 @@
+/* Menu Hari ini: ringkasan, pita jam scan, saring, papan kartu absen. */
+
+/* --- hari ini: ringkasan dan pita jam masuk -------------------------------------------- */
+.ringkasan { font-size: 17px; margin: 0 0 4px; }
+.ringkasan b { font-weight: 700; }
+.pita { position: relative; margin: 30px 0 34px; border-bottom: 1px solid var(--tinta); }
+.pita .titik {
+  position: absolute; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--tinta);
+}
+.pita .titik.telat { background: var(--merah); }
+.pita .titik.lagi { background: var(--muka); border: 1.5px solid var(--redup); width: 8px; height: 8px; margin-left: -4px; }
+/* arahkan kursor ke titik: nama dan jamnya muncul, scan lain orang itu tetap terang, yang lain meredup */
+.pita .titik::before { content: ''; position: absolute; inset: -4px; } /* sasaran kursor lebih besar dari titiknya */
+.pita .titik::after {
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  padding: 4px 9px; border-radius: 6px; background: var(--tinta); color: var(--muka); font-size: 12px; font-weight: 600;
+  white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.1s;
+}
+.pita .titik.kiri::after { left: -6px; transform: none; }
+.pita .titik.kanan::after { left: auto; right: -6px; transform: none; }
+.pita .titik:hover { z-index: 1; outline: 2px solid var(--tinta); outline-offset: 2px; }
+.pita .titik:hover::after { opacity: 1; }
+.pita .titik { transition: opacity 0.12s; }
+.pita.sorot .titik:not(.ini) { opacity: 0.2; }
+@media (prefers-reduced-motion: reduce) { .pita .titik, .pita .titik::after { transition: none; } }
+/* judul bagian dengan isian di kanan (legenda, kotak cari) */
+.judul-baris { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin: 0 0 12px; }
+.judul-baris > * { margin: 0; }
+.judul-baris > :not(:first-child) { margin-left: auto; } /* yang tampil hanya satu */
+.judul-baris + .pita { margin-top: 34px; }
+#papan-cari { width: 220px; }
+/* halaman (ui.js paginate) */
+.halaman { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 12px 0 0; font-size: 13px; color: var(--redup); }
+.halaman > span:first-child { margin-right: auto; }
+.halaman button { min-width: 32px; padding: 0 8px; justify-content: center; border-color: transparent; background: none; color: var(--tinta); }
+.halaman button[aria-current="page"] { background: var(--tinta); border-color: var(--tinta); color: var(--muka); }
+.halaman > span[aria-hidden] { padding: 0 4px; }
+#r-daftar tr.luar { display: none; } /* Semua scan: baris halaman lain; tetap tercetak (lihat @media print) */
+.pita .jam { position: absolute; top: calc(100% + 6px); transform: translateX(-50%); font-size: 11.5px; color: var(--redup); }
+/* garis jam masuk/pulang dan bidang toleransi: warna jadwal (style dari hari-ini.js), label sedikit digelapkan */
+.pita .garis { position: absolute; top: -22px; bottom: 0; width: 1px; }
+.pita .garis span {
+  position: absolute; z-index: 1; top: 0; left: 5px; font-size: 11.5px; color: color-mix(in srgb, var(--c) 75%, var(--tinta)); white-space: nowrap;
+  text-shadow: -2px 0 var(--muka), 2px 0 var(--muka), 0 -2px var(--muka), 0 2px var(--muka); /* garis lain yang lewat tidak memotong tulisan */
+}
+.pita .garis.balik span { left: auto; right: 5px; } /* dekat tepi kanan: label di kiri garis */
+.pita .toleransi { position: absolute; top: -22px; bottom: 0; }
+.pita .sekarang { position: absolute; top: -8px; bottom: -4px; border-left: 2px solid var(--redup); opacity: 0.6; }
+.legenda { font-size: 12.5px; margin: 0 0 16px; }
+.legenda i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--tinta); margin: 0 6px 0 14px; }
+.legenda i:first-child { margin-left: 0; }
+.legenda i.telat { background: var(--merah); }
+.legenda i.lagi { background: none; border: 1.5px solid var(--redup); }
+.daftar-nama { margin: 0 0 6px; max-width: 80ch; }
+.daftar-nama span { color: var(--redup); }
+
+/* --- hari ini: saring dan papan absen --------------------------------------------------
+   Satu kartu per karyawan, bertinta seperti kartu jam kerja: hijau tepat waktu, merah terlambat,
+   biru izin, garis putus-putus belum datang. Kartu dibuka untuk mencatat izin atau koreksi. */
+.saring { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 14px; }
+.saring button {
+  height: 30px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 7px;
+  color: var(--redup); font-weight: 600;
+}
+.saring button b { color: var(--tinta); font-weight: 750; }
+.saring button[aria-pressed="true"] { background: var(--tinta); border-color: var(--tinta); color: var(--muka); }
+.saring button[aria-pressed="true"] b { color: var(--muka); }
+.saring i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.saring .belum i { border: 1.5px dashed currentColor; }
+.saring .telat i { background: var(--merah); } .saring .tepat i { background: var(--hijau); } .saring .izin i { background: var(--izin); }
+.papan { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 0 0 6px; }
+.kartu {
+  height: auto; display: grid; gap: 1px; text-align: left; padding: 10px 14px 11px; border-radius: 10px; white-space: normal;
+  border: 1px solid var(--garis); border-left: 4px solid var(--hijau); background: var(--muka); font-weight: 400;
+}
+.kartu .nama-baris { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.kartu .nama { flex: 1; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* tanda jadwal: titik warna dan nama jadwal (warna dipilih di Jam kerja) */
+.jadwal-tag {
+  display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 1px 8px 1px 6px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; color: var(--tinta); background: color-mix(in srgb, var(--warna) 14%, transparent);
+}
+.jadwal-tag::before, .pita .garis i { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--warna); }
+.pita .garis i { display: inline-block; margin-right: 3px; vertical-align: 1px; }
+.kartu .jam { font-size: 21px; font-weight: 750; letter-spacing: -0.01em; line-height: 1.3; }
+.kartu .status { font-size: 12.5px; font-weight: 650; letter-spacing: 0; margin-left: 6px; color: var(--hijau); }
+.kartu .ket { font-size: 12.5px; color: var(--redup); }
+.kartu.telat { border-left-color: var(--merah); } .kartu.telat .jam, .kartu.telat .status { color: var(--merah); }
+.kartu.izin { border-left-color: var(--izin); } .kartu.izin .jam, .kartu.izin .status { color: var(--izin); }
+.kartu.belum { border-style: dashed; border-left: 4px solid var(--garis); background: transparent; }
+.kartu.belum .jam { color: var(--redup); font-weight: 600; font-size: 15px; line-height: 1.85; }
+.kartu.luar { border-left-color: var(--redup); } .kartu.luar .status { color: var(--redup); }
+.kartu.baru { animation: baru 2.4s ease-out; }
+.orang-kepala { display: flex; gap: 16px; align-items: center; }
+.orang-kepala p { margin: 0 0 4px; }
+/* foto dari mesin 240×320 (potret); tanpa foto: ikon sidik jari */
+.foto-orang {
+  width: 84px; aspect-ratio: 3 / 4; flex: none; display: grid; place-items: center; overflow: hidden;
+  border-radius: 10px; border: 1px solid var(--garis); background: var(--sorot); color: var(--redup);
+}
+.foto-orang img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.foto-orang svg { width: 40px; height: 40px; stroke-width: 1.5; opacity: 0.7; }
+.kartu-status { margin: 0; font-size: 16px; } .kartu-status.telat { color: var(--merah); }
+.kartu-status.tepat { color: var(--hijau); } .kartu-status.izin { color: var(--izin); } .kartu-status.belum, .kartu-status.luar { color: var(--redup); }
+.kosong { padding: 18px; border: 1px dashed var(--garis); border-radius: 10px; color: var(--redup); }
+.catatan { padding: 10px 14px; border-radius: 8px; background: var(--merah-muda); margin: 0 0 14px; }
+.catatan.info { background: var(--sorot); }
+details.lipat > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 9px; width: fit-content;
+  font-size: 15px; font-weight: 650; margin: 26px 0 10px;
+}
+details.lipat > summary::-webkit-details-marker { display: none; }
+details.lipat > summary::before {
+  content: ''; width: 6px; height: 6px; border-right: 2px solid var(--redup); border-bottom: 2px solid var(--redup);
+  transform: rotate(-45deg); transition: transform 0.15s;
+}
+details.lipat[open] > summary::before { transform: rotate(45deg); }

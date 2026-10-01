@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Freedom Finger</title>
+    <link rel="icon" href="./assets/logo.png" />
+    <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/hari-ini.css" />
+    <link rel="stylesheet" href="./styles/dialog.css" />
+    <link rel="stylesheet" href="./styles/halaman.css" />
+    <link rel="stylesheet" href="./styles/masuk.css" />
+    <link rel="stylesheet" href="./styles/cetak.css" />
+  </head>
+  <body class="belum-masuk">
+    <div class="masuk">
+      <form id="masuk-form">
+        <img src="./assets/logo.png" alt="" />
+        <h1>Freedom Finger</h1>
+        <p id="masuk-teks">Menyiapkan aplikasi…</p>
+        <label>User <input name="name" autocomplete="username" autocapitalize="none" spellcheck="false" required disabled /></label>
+        <label>Kata sandi <input type="password" name="sandi" autocomplete="current-password" required disabled /></label>
+        <label id="masuk-ulang" hidden>Ulangi kata sandi <input type="password" name="ulang" autocomplete="new-password" /></label>
+        <p id="masuk-salah" class="merah" role="alert" hidden></p>
+        <button class="utama" name="buka" disabled>Masuk</button>
+        <p class="redup kecil" id="masuk-lupa" hidden>Lupa kata sandi? Minta pengguna lain menghapus user Anda di Pengaturan, lalu membuatnya lagi.</p>
+      </form>
+    </div>
+
+    <div class="aplikasi">
+      <aside class="samping">
+        <div class="merek">
+          <img src="./assets/logo.png" alt="" />
+          <div><b>Freedom Finger</b><span id="status-samping" class="redup" role="status">Menghubungkan…</span><span id="nama-kantor"></span></div>
+        </div>
+        <nav aria-label="Menu">
+          <p class="kelompok">Absensi</p>
+          <button id="tab-hari-ini" aria-controls="hari-ini"><i data-lucide="calendar-check"></i>Hari ini</button>
+          <button id="tab-riwayat" aria-controls="riwayat"><i data-lucide="history"></i>Riwayat</button>
+          <button id="tab-rekap" aria-controls="rekap"><i data-lucide="sheet"></i>Rekap</button>
+          <button id="tab-izin" aria-controls="izin"><i data-lucide="file-pen-line"></i>Izin &amp; koreksi</button>
+          <p class="kelompok">Kelola</p>
+          <button id="tab-karyawan" aria-controls="karyawan"><i data-lucide="users"></i>Karyawan</button>
+          <button id="tab-jam-kerja" aria-controls="jam-kerja"><i data-lucide="clock"></i>Jam kerja</button>
+          <button id="tab-libur" aria-controls="libur"><i data-lucide="calendar-x"></i>Hari libur</button>
+          <button id="tab-mesin" aria-controls="mesin"><i data-lucide="fingerprint-pattern"></i>Mesin</button>
+          <p class="kelompok">Sistem</p>
+          <button id="tab-pengaturan" aria-controls="pengaturan"><i data-lucide="settings"></i>Pengaturan</button>
+        </nav>
+        <div class="kaki">
+          <button id="keluar" title="Keluar dari aplikasi"><i data-lucide="log-out"></i>Keluar <span id="user-aktif" class="redup"></span></button>
+        </div>
+      </aside>
+
+      <main>
+        <section id="hari-ini" aria-labelledby="judul-hari-ini">
+          <header class="kepala"><h1 id="judul-hari-ini">Hari ini</h1><p id="tanggal"></p></header>
+          <p id="status-mesin" class="catatan off" hidden></p>
+          <p id="peringatan" class="catatan off" hidden></p>
+          <div class="judul-baris">
+            <h2>Sebaran jam scan</h2>
+            <p id="pita-legenda" class="legenda redup" aria-hidden="true" hidden><i></i>scan pertama<i class="telat"></i>terlambat<i class="lagi"></i>scan berikutnya</p>
+            <p id="pita-kosong" class="legenda redup" hidden>Belum ada scan. Titik muncul di sini begitu karyawan scan.</p>
+          </div>
+          <!-- titik = satu scan; arahkan kursor untuk nama. Isinya sama dengan tabel di bawah, jadi disembunyikan dari pembaca layar -->
+          <div id="pita" class="pita" aria-hidden="true"></div>
+          <div class="judul-baris">
+            <p id="ringkasan" class="ringkasan" hidden></p>
+            <input type="search" id="papan-cari" placeholder="Cari nama atau PIN" aria-label="Cari karyawan hari ini" hidden />
+          </div>
+          <div id="saring" class="saring" role="group" aria-label="Tampilkan karyawan"></div>
+          <div id="papan" class="papan" aria-live="polite"></div>
+          <nav id="papan-hal" class="halaman" aria-label="Halaman kartu karyawan" hidden></nav>
+          <details class="lipat">
+            <summary>Semua scan hari ini <span id="jumlah" class="redup"></span></summary>
+            <div class="controls"><input type="search" id="daftar-cari" placeholder="Cari nama atau PIN" aria-label="Cari scan hari ini" /></div>
+            <table>
+              <thead><tr><th>Jam</th><th>Nama</th><th>PIN</th><th>Dihitung sebagai</th><th>Verifikasi</th></tr></thead>
+              <tbody id="daftar"></tbody>
+            </table>
+            <nav id="daftar-hal" class="halaman" aria-label="Halaman scan hari ini" hidden></nav>
+          </details>
+          <p id="isian" class="muted kecil" style="margin-top: 20px" hidden></p>
+        </section>
+
+        <section id="riwayat" aria-labelledby="judul-riwayat" hidden>
+          <header class="kepala">
+            <h1 id="judul-riwayat">Riwayat absen</h1><p>Dari scan mesin, izin, dan koreksi manual</p>
+          </header>
+          <div class="controls">
+            <input type="date" id="r-dari" data-sampai="r-sampai" aria-label="Rentang tanggal" />
+            <input type="date" id="r-sampai" />
+            <input type="search" id="r-cari" placeholder="Cari nama atau PIN" aria-label="Cari nama atau PIN" />
+            <span class="grup pilih-tampilan" id="r-tampilan" role="group" aria-label="Tampilan"><button data-v="hari" aria-pressed="true">Per hari</button><button data-v="scan" aria-pressed="false">Semua scan</button></span>
+            <select id="r-mesin" aria-label="Mesin" hidden></select>
+            <span class="grup kanan" role="group" aria-label="Simpan atau cetak"><button id="r-xlsx"><i data-lucide="file-spreadsheet"></i>Excel</button><button id="r-csv"><i data-lucide="file-text"></i>CSV</button><button id="r-cetak"><i data-lucide="printer"></i>Cetak</button></span>
+          </div>
+          <p class="print-title" id="r-judul"></p>
+          <div id="r-hari">
+            <div class="matriks-bungkus"><table class="matriks"><thead id="r-kepala"></thead><tbody id="r-baris"></tbody></table></div>
+            <p class="legenda-sel redup no-print"><i class="telat"></i>terlambat<i class="izin"></i>izin, sakit, cuti<span><b class="alpa">Alpa</b> tidak masuk</span><i class="libur"></i>libur
+              <span><b>?</b> tanpa pulang</span><span><u>10:00</u> koreksi manual</span></p>
+          </div>
+          <div id="r-scan" hidden>
+            <p id="r-info" class="meta"></p>
+            <table class="log">
+              <thead><tr><th class="jam">Jam</th><th>Nama</th><th>Dihitung sebagai</th><th>Verifikasi</th><th class="mesin">Mesin</th></tr></thead>
+              <tbody id="r-daftar"></tbody>
+            </table>
+            <nav id="r-hal" class="halaman no-print" aria-label="Halaman scan" hidden></nav>
+          </div>
+        </section>
+
+        <section id="rekap" aria-labelledby="judul-rekap" hidden>
+          <header class="kepala">
+            <h1 id="judul-rekap">Rekap</h1><p>Per karyawan, dari scan, izin, dan koreksi</p>
+          </header>
+          <div class="controls">
+            <select id="k-bulan" aria-label="Bulan"></select>
+            <input type="date" id="k-dari" data-sampai="k-sampai" aria-label="Rentang tanggal" />
+            <input type="date" id="k-sampai" />
+            <span class="grup kanan" role="group" aria-label="Simpan atau cetak"><button id="k-xlsx"><i data-lucide="file-spreadsheet"></i>Excel</button><button id="k-csv"><i data-lucide="file-text"></i>CSV</button><button id="k-cetak"><i data-lucide="printer"></i>Cetak</button></span>
+          </div>
+          <p class="print-title" id="k-judul"></p>
+          <div id="k-info" class="keterangan no-print"></div>
+          <div id="k-ringkasan">
+            <table>
+              <thead><tr><th>Karyawan</th><th class="num">Hadir</th><th class="num">Terlambat</th>
+                <th class="num">Pulang cepat</th><th class="num">Lupa pulang</th><th class="num">Alpa</th><th class="num">Izin</th>
+                <th class="num">Jam kerja</th><th class="num lembur">Lembur</th></tr></thead>
+              <tbody id="k-daftar"></tbody>
+            </table>
+            <p class="legenda-strip muted no-print"><i class="hadir"></i>hadir <i class="telat"></i>terlambat <i class="alpa"></i>alpa <i class="izin"></i>izin, sakit, cuti <i class="libur"></i>libur</p>
+            <p class="muted kecil no-print">Klik nama untuk rincian per hari. Terlambat dan pulang cepat: berapa kali, dengan total jam:menit di bawahnya.</p>
+          </div>
+          <div id="k-rincian" hidden>
+            <div class="rincian-kepala no-print"><button id="k-kembali">← Semua karyawan</button><h2 id="k-nama"></h2></div>
+            <p id="k-hari-info" class="meta no-print"></p>
+            <table>
+              <thead><tr><th>Tanggal</th><th>Masuk</th><th>Pulang</th><th>Status</th><th class="num">Terlambat (mnt)</th>
+                <th class="num">Pulang cepat (mnt)</th><th class="num">Jam kerja</th><th class="num lembur">Lembur</th><th>Keterangan</th><th class="no-print"><span class="sr-only">Tindakan</span></th></tr></thead>
+              <tbody id="k-hari"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="izin" aria-labelledby="judul-izin" hidden>
+          <header class="kepala">
+            <h1 id="judul-izin">Izin &amp; koreksi</h1><p>Disimpan di aplikasi ini saja; log absen di mesin tidak pernah diubah</p>
+          </header>
+          <div class="judul-tabel">
+            <div><h2>Izin, sakit, cuti, dinas luar</h2><p class="muted">Hari kerja dengan catatan ini tidak dihitung alpa, walau ada scan.</p></div>
+            <button id="i-baru-izin" class="utama"><i data-lucide="plus"></i>Catat izin</button>
+          </div>
+          <table>
+            <thead><tr><th>Tanggal</th><th>Nama</th><th>Jenis</th><th>Keterangan</th><th></th></tr></thead>
+            <tbody id="i-izin-daftar"></tbody>
+          </table>
+          <nav id="i-izin-hal" class="halaman" aria-label="Halaman izin" hidden></nav>
+          <div class="judul-tabel">
+            <div><h2>Koreksi absen</h2><p class="muted">Untuk karyawan yang lupa scan. Koreksi dihitung di Rekap seperti scan biasa, dan tampil bertanda "manual" di Riwayat.</p></div>
+            <button id="i-baru-koreksi"><i data-lucide="plus"></i>Koreksi absen</button>
+          </div>
+          <table>
+            <thead><tr><th>Tanggal</th><th>Jam</th><th>Nama</th><th>Alasan</th><th></th></tr></thead>
+            <tbody id="i-koreksi-daftar"></tbody>
+          </table>
+          <nav id="i-koreksi-hal" class="halaman" aria-label="Halaman koreksi" hidden></nav>
+        </section>
+
+        <section id="karyawan" aria-labelledby="judul-karyawan" hidden>
+          <header class="kepala">
+            <h1 id="judul-karyawan">Karyawan</h1><p id="y-info"></p>
+          </header>
+          <p id="y-status" class="catatan info" role="status" hidden></p>
+          <div class="keterangan">
+            <p><i data-lucide="pen-line"></i><span>Nama lengkap dan departemen yang diisi di sini dipakai di semua layar dan laporan. Tersimpan otomatis.</span></p>
+            <p><i data-lucide="fingerprint-pattern"></i><span>Mesin hanya menyimpan nama sampai <b>15 karakter</b>, jadi tulis nama lengkapnya di sini.</span></p>
+            <p><i data-lucide="user-plus"></i><span>Karyawan baru yang didaftarkan di mesin muncul di daftar ini dengan sendirinya.</span></p>
+          </div>
+          <div class="controls">
+            <input type="search" id="y-cari" placeholder="Cari nama atau PIN" aria-label="Cari karyawan" />
+            <button id="y-ambil" class="kanan"><i data-lucide="download"></i>Ambil data dari mesin</button>
+            <button id="y-tambah-buka" class="utama"><i data-lucide="user-plus"></i>Tambah karyawan</button>
+          </div>
+          <table class="karyawan">
+            <thead><tr><th class="pin">PIN</th><th>Nama</th><th style="width: 24%">Departemen</th><th style="width: 18%">Jadwal</th><th>Terdaftar di mesin</th><th class="tengah">Ikut rekap</th></tr></thead>
+            <tbody id="y-daftar"></tbody>
+          </table>
+          <details id="y-dihapus" class="lipat" hidden>
+            <summary></summary>
+            <p class="muted">Pulihkan = kirim lagi ke mesin dari cadangan di aplikasi: nama, hak akses, jari, wajah, kartu, dan password seperti
+              terakhir dikirim mesin. PIN-nya dicek dulu di mesin supaya tidak menimpa orang lain. Matikan Ikut rekap untuk akun uji:
+              orangnya tidak tampil lagi di Riwayat dan Rekap.</p>
+            <p class="catatan info" role="status" hidden></p>
+            <table>
+              <thead><tr><th class="pin">PIN</th><th>Nama</th><th>Dihapus</th><th>Cadangan</th><th class="tengah">Ikut rekap</th><th></th></tr></thead>
+              <tbody id="y-dihapus-daftar"></tbody>
+            </table>
+          </details>
+        </section>
+
+        <section id="mesin" aria-labelledby="judul-mesin" hidden>
+          <header class="kepala"><h1 id="judul-mesin">Mesin</h1><p>Jam mesin disetel otomatis bila selisihnya lebih dari 2 menit</p></header>
+          <div id="m-daftar"></div>
+          <h2>Cari mesin di jaringan</h2>
+          <p class="muted">Mencari mesin di jaringan kantor lewat port 5005, beserta petunjuk isian menunya.</p>
+          <div class="controls"><button id="m-cari">Cari mesin</button><button id="m-panduan">Panduan hubungkan mesin</button></div>
+          <div id="m-hasil"></div>
+        </section>
+
+        <section id="jam-kerja" aria-labelledby="judul-jam-kerja" class="form" hidden>
+          <header class="kepala"><h1 id="judul-jam-kerja">Jam kerja</h1><p>Tersimpan otomatis dan langsung dipakai rekap</p></header>
+          <div class="judul-tabel">
+            <div><h2>Jadwal</h2>
+          <p class="muted kecil">Jadwal utama berlaku untuk semua karyawan, kecuali yang dipilihkan jadwal lain di menu Karyawan.
+            Lembur dinyalakan per hari: di hari kerja dihitung setelah jam pulang, di hari libur seluruh jam kerja dihitung lembur.
+            Maks. jam = lembur paling lama hari itu; kosong berarti tanpa batas. Bebas = datang dan pulang kapan saja: hadir bila scan,
+            tanpa terlambat, pulang cepat, atau lembur. Bulatan warna di samping nama jadwal = warna jadwal di Hari ini.</p></div>
+            <button id="p-jadwal-tambah" class="utama" title="Mis. paruh waktu atau shift"><i data-lucide="plus"></i>Tambah jadwal lain</button>
+          </div>
+          <div id="p-jadwal" class="jadwal-grid"></div>
+          <h2 class="sub">Aturan rekap</h2>
+          <p class="muted kecil">Berlaku untuk semua jadwal.</p>
+          <div class="panel aturan">
+            <label class="bidang">Toleransi terlambat <span class="satuan"><input type="number" id="p-toleransi" min="0" max="600" /> menit</span>
+              <small>Menit terlambat tetap dihitung dari jam masuk. Contoh: masuk 08:00, toleransi 15, scan 08:20 = terlambat 20 menit.</small></label>
+            <label class="bidang">Scan kedua dihitung pulang bila minimal <span class="satuan"><input type="number" id="p-jarak" min="0" max="600" /> menit setelah masuk</span>
+              <small>Scan yang lebih dekat dianggap scan ganda.</small></label>
+            <label class="bidang">Lembur dihitung mulai <span class="satuan"><input type="number" id="p-lembur" min="0" max="600" /> menit setelah jam pulang</span>
+              <small>Lembur di bawah batas ini dihitung 0. Hari yang dihitung lembur diatur per hari di jadwal.</small></label>
+          </div>
+          <p><button id="p-jadwal-awal" class="mini">Kembalikan jam kerja dan aturan ke nilai awal</button></p>
+        </section>
+
+        <section id="libur" aria-labelledby="judul-libur" class="form" hidden>
+          <header class="kepala"><h1 id="judul-libur">Hari libur</h1><p>Tidak dihitung alpa. Libur nasional belum terisi otomatis</p></header>
+          <div class="sempit">
+            <p class="controls panel tambah">
+              <input type="date" id="p-libur-tanggal" aria-label="Tanggal libur" />
+              <input id="p-libur-ket" placeholder="Keterangan, mis. Tahun Baru" aria-label="Keterangan libur" />
+              <button id="p-libur-tambah" class="utama"><i data-lucide="plus"></i>Tambah</button>
+            </p>
+            <div id="p-libur"></div>
+          </div>
+        </section>
+
+        <section id="pengaturan" aria-labelledby="judul-pengaturan" class="form" hidden>
+          <header class="kepala"><h1 id="judul-pengaturan">Pengaturan</h1><p>Tersimpan otomatis</p></header>
+          <div class="blok">
+            <header><h2>Kantor</h2><p>Nama ini tampil di judul laporan.</p></header>
+            <div class="isi"><label class="bidang">Nama kantor <input id="p-kantor" placeholder="Mis. PT Maju Jaya, Cabang Bekasi" /></label></div>
+          </div>
+          <div class="blok">
+            <header><h2>Pengguna</h2><p>Semua pengguna punya hak yang sama. Hapus user orang yang sudah tidak bertugas.</p></header>
+            <div class="isi">
+              <table><thead><tr><th>User</th><th>Dibuat</th><th></th></tr></thead><tbody id="u-daftar"></tbody></table>
+              <div class="baris-jari"><button id="u-tambah-buka"><i data-lucide="user-plus"></i>Tambah pengguna</button><button id="p-sandi-buka">Ganti kata sandi saya</button></div>
+            </div>
+          </div>
+          <div class="blok">
+            <header><h2>Alamat untuk mesin</h2><p>Isi di menu Jaringan mesin absensi. IP server Freedom Finger sebaiknya direservasi di router.</p></header>
+            <div class="isi"><dl class="info-mesin"><dt>Mode</dt><dd>Internet</dd><dt>Server IP</dt><dd id="p-ip"></dd><dt>Server Port</dt><dd id="p-port"></dd><dt>Server Req</dt><dd>Ya</dd></dl></div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <dialog id="laci" class="laci" aria-labelledby="laci-judul">
+      <header class="laci-kepala">
+        <div><h2 id="laci-judul"></h2><p id="laci-sub" hidden></p></div>
+        <button type="button" id="laci-tutup" aria-label="Tutup panel">&times;</button>
+      </header>
+      <div id="laci-orang" class="laci-isi" hidden></div>
+      <form id="i-izin" class="laci-isi" hidden>
+        <label class="bidang">Karyawan <select name="pin" required></select></label>
+        <fieldset class="bidang"><legend>Jenis</legend><div class="pilihan" id="i-jenis"></div></fieldset>
+        <div class="baris">
+          <label class="bidang">Dari tanggal <input type="date" name="from" required /></label>
+          <label class="bidang">Sampai tanggal <input type="date" name="to" /><small>Kosongkan untuk satu hari</small></label>
+        </div>
+        <label class="bidang">Keterangan <input name="note" placeholder="Mis. surat dokter, acara keluarga" /></label>
+        <p class="muted kecil">Hari kerja dengan catatan ini tidak dihitung alpa, walau ada scan.</p>
+        <div class="laci-kaki"><button type="button" name="batal">Batal</button><button name="simpan" class="utama">Simpan</button></div>
+      </form>
+      <form id="p-sandi" class="laci-isi" hidden>
+        <label class="bidang">Kata sandi sekarang <input type="password" name="lama" autocomplete="current-password" required /></label>
+        <label class="bidang">Kata sandi baru <input type="password" name="baru" autocomplete="new-password" minlength="8" required /><small>Minimal 8 karakter</small></label>
+        <label class="bidang">Ulangi kata sandi baru <input type="password" name="ulang" autocomplete="new-password" required /></label>
+        <div class="laci-kaki"><button type="button" name="batal">Batal</button><button class="utama">Ganti kata sandi</button></div>
+      </form>
+      <form id="y-tambah" class="laci-isi" hidden>
+        <div class="baris">
+          <label class="bidang">PIN <input name="pin" inputmode="numeric" pattern="[0-9]{1,22}" required /><small>Nomor di mesin, belum dipakai</small></label>
+          <label class="bidang">Jadwal <select name="schedule"></select></label>
+        </div>
+        <label class="bidang">Nama lengkap <input name="name" maxlength="60" required autocomplete="off" /><small name="dimesin">Di mesin tertulis 15 huruf pertama</small></label>
+        <div class="baris">
+          <label class="bidang">Departemen <input name="dept" autocomplete="off" /></label>
+          <label class="bidang">Hak di mesin <select name="privilege"><option value="1">Karyawan</option><option value="2">Admin</option><option value="3">Subadmin</option></select></label>
+        </div>
+        <p class="catatan info" role="status" hidden></p>
+        <div class="laci-kaki"><button type="button" name="batal">Batal</button><button name="simpan" class="utama">Tambah ke mesin</button></div>
+      </form>
+      <form id="u-tambah" class="laci-isi" hidden>
+        <label class="bidang">User <input name="name" autocomplete="off" autocapitalize="none" spellcheck="false" pattern="[a-z0-9._\-]{3,32}" required />
+          <small>3–32 karakter: huruf kecil, angka, titik, garis bawah, atau strip</small></label>
+        <label class="bidang">Kata sandi <input type="password" name="sandi" autocomplete="new-password" minlength="8" required /><small>Minimal 8 karakter</small></label>
+        <label class="bidang">Ulangi kata sandi <input type="password" name="ulang" autocomplete="new-password" required /></label>
+        <div class="laci-kaki"><button type="button" name="batal">Batal</button><button class="utama">Tambah pengguna</button></div>
+      </form>
+      <div id="y-laci-daftar" class="laci-isi" hidden></div>
+      <div id="panduan" class="laci-isi" hidden>
+        <ol class="langkah">
+          <li><h3>Nyalakan mesin dan cari</h3>
+            <p class="muted">Mesin dan server Freedom Finger harus tersambung ke jaringan kantor yang sama.</p>
+            <p><button type="button" id="pd-cari">Cari mesin</button></p><div id="pd-hasil"></div></li>
+          <li><h3>Isi menu mesin</h3>
+            <p class="muted">Di mesin buka <b>Menu → Jaringan</b>, isi persis seperti ini, lalu simpan:</p>
+            <dl id="pd-isian" class="info-mesin"></dl>
+            <p class="muted kecil">Minta admin jaringan mereservasi IP server di router. Bila IP-nya berubah, mesin tidak bisa mengirim absen ke sana.</p></li>
+          <li><h3>Tunggu mesin terhubung</h3>
+            <div class="pd-tunggu"><div id="pd-ikon" class="putar"></div><p id="pd-status" role="status"></p></div></li>
+          <li><h3>Mulai pakai</h3>
+            <div class="baris-jari rata"><button type="button" id="pd-ambil" class="utama">Ambil data karyawan</button><button type="button" id="pd-jam">Atur jam kerja</button></div></li>
+        </ol>
+      </div>
+      <form id="i-koreksi" class="laci-isi" hidden>
+        <label class="bidang">Karyawan <select name="pin" required></select></label>
+        <div class="baris">
+          <label class="bidang">Tanggal <input type="date" name="date" required /></label>
+          <label class="bidang">Jam <input type="time" name="time" required /></label>
+        </div>
+        <label class="bidang">Alasan <input name="reason" required placeholder="Mis. lupa absen pulang" /></label>
+        <p class="muted kecil">Dihitung di Rekap seperti scan biasa, dan tampil bertanda "manual" di Riwayat. Log di mesin tidak diubah.</p>
+        <div class="laci-kaki"><button type="button" name="batal">Batal</button><button name="simpan" class="utama">Simpan</button></div>
+      </form>
+    </dialog>
+    <dialog id="tunggu" class="tunggu" aria-labelledby="tunggu-teks">
+      <div class="putar" aria-hidden="true"></div>
+      <p id="tunggu-teks" role="status"></p>
+      <p id="tunggu-lama" class="muted kecil"></p>
+    </dialog>
+    <dialog id="tanya" class="laci tanya" aria-labelledby="tanya-judul">
+      <header class="laci-kepala"><div><h2 id="tanya-judul"></h2></div></header>
+      <form method="dialog" class="laci-isi">
+        <p id="tanya-teks"></p>
+        <div class="laci-kaki"><button value="" name="batal"></button><button value="ya" name="ya" class="utama"></button></div>
+      </form>
+    </dialog>
+    <p id="pesan" role="status" hidden></p>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

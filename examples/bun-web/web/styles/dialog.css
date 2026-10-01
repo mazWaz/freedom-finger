@@ -1,0 +1,90 @@
+/* Lapisan di atas halaman: laci (modal), layar tunggu, dialog tanya, pesan (toast). */
+
+/* --- laci: modal di tengah untuk form izin/koreksi dan rincian satu karyawan ------------- */
+dialog.laci {
+  width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); margin: auto; padding: 0; /* setinggi jendela bila isinya panjang */
+  border: 1px solid var(--garis); border-radius: 14px; background: var(--muka); color: var(--tinta);
+  box-shadow: 0 24px 64px rgba(12, 16, 24, 0.24);
+}
+dialog.laci[open] { display: flex; flex-direction: column; animation: laci-masuk 0.16s ease-out; }
+dialog.laci::backdrop { background: rgba(12, 16, 24, 0.32); }
+@keyframes laci-masuk { from { transform: translateY(10px) scale(0.98); opacity: 0; } }
+.laci-kepala { display: flex; align-items: flex-start; gap: 12px; padding: 20px 22px 16px; border-bottom: 1px solid var(--garis); }
+.laci-kepala h2 { margin: 0; font-size: 18px; }
+.laci-kepala p { margin: 3px 0 0; color: var(--redup); }
+.laci-kepala button { margin-left: auto; border: 0; background: none; font-size: 22px; line-height: 1; padding: 0 10px; color: var(--redup); }
+/* tinggi = isinya, menyusut dan bergulir bila melebihi modal. Bukan flex: 1 (basis 0): WebKit (aplikasi di macOS)
+   lalu menghitung tinggi modal tanpa isi, sehingga isinya terpotong */
+.laci-isi { flex: 0 1 auto; min-height: 0; overflow-y: auto; padding: 18px 22px 22px; display: flex; flex-direction: column; gap: 14px; }
+.laci-isi[hidden] { display: none; }
+.bidang { display: flex; flex-direction: column; align-items: stretch; gap: 6px; font-weight: 600; font-size: 13px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.bidang legend { padding: 0; margin-bottom: 6px; }
+.bidang input:not([type="radio"]):not([type="checkbox"]), .bidang select { width: 100%; height: 36px; font-weight: 400; }
+.bidang small { font-weight: 400; font-size: 12.5px; color: var(--redup); }
+.baris { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pilihan { display: flex; flex-wrap: wrap; gap: 6px; }
+.pilihan label { height: 34px; padding: 0 12px; border: 1px solid var(--garis); border-radius: 8px; font-weight: 550; cursor: pointer; }
+.pilihan input { accent-color: var(--izin); margin: 0; }
+/* tombol simpan/batal tetap terlihat saat isi modal digulir (menutup padding bawah .laci-isi) */
+.laci-kaki {
+  display: flex; gap: 8px; justify-content: flex-end; margin: auto 0 -22px; padding: 12px 0 22px;
+  position: sticky; bottom: -22px; background: var(--muka);
+}
+.laci-kaki button { height: 36px; }
+.kecil { font-size: 12.5px; }
+.scan-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--garis); }
+.scan-list li { display: flex; gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--garis); }
+.scan-list b { font-size: 16px; min-width: 3.2em; }
+.tindakan { display: flex; flex-direction: column; gap: 8px; }
+.tindakan button { height: 38px; }
+.baris-jari { display: flex; gap: 8px; } .baris-jari select, .baris-jari.rata button { flex: 1; height: 38px; }
+.laci-isi h3 { margin: 8px 0 -6px; } td.kanan { text-align: right; }
+.hapus-karyawan { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--garis); } .hapus-karyawan p { margin: 8px 0 0; }
+.hapus-karyawan .catatan { margin: 0 0 10px; } .hapus-karyawan input { flex: 1; min-width: 0; height: 38px; }
+.kred { display: flex; gap: 10px; align-items: center; justify-content: space-between; color: var(--redup); font-size: 13px; }
+.kred b { font-weight: 500; color: var(--tinta); }
+button.ikon { width: 30px; padding: 0; justify-content: center; color: var(--redup); } button.ikon svg { width: 18px; height: 18px; }
+@media (prefers-reduced-motion: reduce) { dialog.laci[open] { animation: none; } details.lipat > summary::before { transition: none; } }
+
+/* --- layar tunggu: menunggu mesin, seluruh halaman terkunci ------------------------------ */
+dialog.tunggu {
+  width: min(360px, calc(100vw - 32px)); margin: auto; padding: 28px 28px 22px; border: 1px solid var(--garis); border-radius: 14px;
+  background: var(--muka); color: var(--tinta); text-align: center; box-shadow: 0 24px 64px rgba(12, 16, 24, 0.28); cursor: progress;
+}
+dialog.tunggu[open] { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+dialog.tunggu::backdrop { background: rgba(12, 16, 24, 0.5); cursor: progress; }
+.putar { position: relative; width: 64px; height: 64px; display: grid; place-items: center; color: var(--hijau); margin-bottom: 10px; }
+.putar::before {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  border: 3px solid var(--hijau-muda); border-top-color: var(--hijau); animation: putar 0.9s linear infinite;
+}
+.putar svg { width: 26px; height: 26px; }
+@keyframes putar { to { transform: rotate(360deg); } }
+#tunggu-teks { margin: 0; font-weight: 600; font-size: 15px; line-height: 1.45; }
+#tunggu-lama { margin: 0; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .putar::before { animation-duration: 2.4s; } }
+.langkah { list-style: none; counter-reset: langkah; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 22px; }
+.langkah > li { counter-increment: langkah; position: relative; padding-left: 38px; }
+.langkah > li::before {
+  content: counter(langkah); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--hijau-muda); color: var(--hijau); font-weight: 700; font-size: 13px;
+}
+.langkah > li > h3 { margin: 3px 0 8px; } .langkah p { margin: 0 0 10px; } .langkah .info-mesin { font-size: 15px; }
+.pd-tunggu { display: flex; align-items: center; gap: 14px; } .pd-tunggu p { margin: 0; }
+.pd-tunggu .putar { width: 44px; height: 44px; margin: 0; flex: none; } .pd-tunggu .putar svg { width: 20px; height: 20px; }
+.putar.selesai::before { animation: none; border-color: var(--hijau); }
+.temuan { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; max-width: 760px; }
+.temuan li { border: 1px solid var(--garis); border-radius: 10px; padding: 10px 14px; font-size: 13.5px; }
+.temuan .muted { display: block; margin-top: 4px; font-size: 13px; }
+
+/* --- pesan (toast) ---------------------------------------------------------------------- */
+#pesan {
+  position: fixed; right: 20px; bottom: 20px; max-width: 440px; margin: 0; padding: 11px 16px; z-index: 5;
+  background: var(--muka); color: var(--tinta); border: 1px solid var(--garis); border-left: 4px solid var(--hijau);
+  border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14); cursor: pointer;
+}
+#pesan.off { border-left-color: var(--merah); }
+
+/* dialog tanya (ui.js ask): pengganti dialog konfirmasi bawaan, judul dan label tombol bisa diatur */
+dialog.tanya { width: min(440px, calc(100vw - 32px)); }
+dialog.tanya .laci-isi p { margin: 0; white-space: pre-line; }

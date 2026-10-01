@@ -1,0 +1,150 @@
+/* Dasar: warna, kontrol, pemilih tanggal, tabel, kerangka sidebar + isi. File CSS dimuat berurutan (index.html). */
+
+/* Aturan warna ala kartu jam kerja: yang normal bertinta biasa, pengecualian (terlambat, alpa)
+   bertinta merah. Hijau = identitas aplikasi (warna ikon), dipakai untuk aksi utama dan navigasi. */
+:root {
+  color-scheme: light dark;
+  --kertas: #f3f4f6; --samping: #e9ebef; --muka: #fff; --tinta: #1c2230; --redup: #5e6677; --garis: #dcdfe6;
+  --hijau: #1a7f37; --hijau-muda: rgba(26, 127, 55, 0.1); --merah: #c1272d; --merah-muda: rgba(193, 39, 45, 0.07);
+  --izin: #2d6a8f; --sorot: rgba(28, 34, 48, 0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --kertas: #171a21; --samping: #13161c; --muka: #1d2129; --tinta: #e4e7ee; --redup: #99a1b3; --garis: #2d323f;
+    --hijau: #4cc27a; --hijau-muda: rgba(76, 194, 122, 0.14); --merah: #ff7b73; --merah-muda: rgba(255, 123, 115, 0.1);
+    --izin: #7cb8dc; --sorot: rgba(228, 231, 238, 0.06);
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; } /* juga elemen yang display-nya diatur CSS (flex, grid) */
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--kertas); color: var(--tinta);
+  font: 14px/1.5 'Plus Jakarta Sans Variable', system-ui, sans-serif; font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: 22px; line-height: 1.25; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+h2 { font-size: 15px; font-weight: 650; margin: 28px 0 10px; }
+h3 { font-size: 14px; font-weight: 650; margin: 18px 0 8px; }
+p { margin: 0 0 10px; }
+code { font-size: 13px; }
+.muted, .redup { color: var(--redup); }
+.ok { color: var(--hijau); } .off, .merah { color: var(--merah); }
+.num { text-align: right; white-space: nowrap; }
+
+/* --- kontrol ------------------------------------------------------------------------ */
+input, select, button { font: inherit; font-size: 13.5px; color: inherit; }
+input:not([type="checkbox"]), select {
+  height: 32px; padding: 0 9px; border: 1px solid var(--garis); border-radius: 7px; background: var(--muka);
+}
+input[type="number"] { width: 5.5em; }
+input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--hijau); margin: 0; }
+input:disabled, select:disabled { opacity: 0.55; }
+button {
+  height: 32px; padding: 0 13px; border: 1px solid var(--garis); border-radius: 7px; background: var(--muka);
+  font-weight: 550; cursor: pointer; white-space: nowrap;
+}
+button { display: inline-flex; align-items: center; gap: 6px; }
+button svg { width: 16px; height: 16px; flex: none; }
+button:hover:not(:disabled) { background: var(--sorot); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.utama { background: var(--hijau); border-color: var(--hijau); color: #fff; }
+button.utama:hover:not(:disabled) { background: var(--hijau); filter: brightness(1.08); }
+@media (prefers-color-scheme: dark) { button.utama { color: #0f1a13; } }
+button.bahaya { color: var(--merah); }
+:focus-visible { outline: 2px solid var(--hijau); outline-offset: 2px; }
+input:focus-visible, select:focus-visible { outline-offset: 0; border-color: var(--hijau); }
+label { display: inline-flex; gap: 8px; align-items: center; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
+.controls .kanan { margin-left: auto; } /* tombol ekspor dan tambah: rata kanan, tepat di atas tabel */
+/* judul tabel dengan tombolnya di kanan (Izin & koreksi, Jam kerja) */
+.judul-tabel { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 16px; margin: 26px 0 12px; }
+.kepala + .judul-tabel { margin-top: 0; }
+.judul-tabel > div { flex: 1; min-width: 260px; }
+.judul-tabel > div > * { margin: 0; }
+.judul-tabel > div > p { margin-top: 3px; }
+
+/* --- pemilih tanggal (tanggal.js) --------------------------------------------------------- */
+button.pilih-tanggal { font-weight: 450; gap: 8px; padding: 0 11px; }
+button.pilih-tanggal svg { color: var(--redup); }
+.bidang button.pilih-tanggal { width: 100%; height: 36px; font-weight: 400; }
+.kalender {
+  inset: auto; margin: 0; padding: 0; border: 1px solid var(--garis); border-radius: 10px;
+  background: var(--muka); color: var(--tinta); box-shadow: 0 12px 32px rgba(12, 16, 24, 0.16);
+}
+.kalender:popover-open { display: flex; }
+.kalender button { border: 0; background: none; }
+.kalender .preset { display: flex; flex-direction: column; gap: 1px; padding: 8px; border-right: 1px solid var(--garis); min-width: 158px; }
+.kalender .preset button { height: 30px; padding: 0 10px; font-weight: 500; }
+.kalender .preset button[aria-pressed="true"] { background: var(--hijau-muda); color: var(--hijau); font-weight: 650; }
+.kalender .bulan { width: 272px; padding: 10px 12px 12px; }
+.kalender header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.kalender header b { font-weight: 650; }
+.kalender header button { width: 32px; padding: 0; justify-content: center; color: var(--redup); }
+.kalender .hari { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; }
+.kalender .hari span { height: 26px; line-height: 26px; text-align: center; font-size: 12px; font-weight: 600; color: var(--redup); }
+.kalender .hari button { height: 34px; padding: 0; justify-content: center; font-weight: 500; }
+.kalender .hari .lain { color: var(--redup); opacity: 0.6; }
+.kalender .hari .ini { box-shadow: inset 0 0 0 1px var(--hijau); }
+.kalender .hari .antara { background: var(--hijau-muda); border-radius: 0; }
+.kalender .hari .pilih, .kalender .hari .pilih:hover:not(:disabled) { background: var(--hijau); color: #fff; opacity: 1; }
+@media (prefers-color-scheme: dark) { .kalender .hari .pilih { color: #0f1a13; } }
+.kalender .petunjuk { margin: 8px 2px 0; font-size: 12.5px; color: var(--redup); }
+.kalender .bawah { display: flex; justify-content: space-between; margin-top: 8px; }
+.kalender .bawah button { height: 30px; padding: 0 8px; color: var(--hijau); }
+.spacer { flex: 1; }
+.form p { margin: 10px 0; }
+
+/* --- tabel --------------------------------------------------------------------------- */
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--garis); vertical-align: middle; }
+th { color: var(--redup); font-weight: 600; font-size: 12.5px; }
+thead th { position: sticky; top: 0; background: var(--muka); z-index: 1; }
+tr.klik { cursor: pointer; } tr.klik:hover, tr.klik:focus { background: var(--sorot); outline: none; }
+tr.alpa td { color: var(--merah); background: var(--merah-muda); }
+tr.libur td { color: var(--redup); }
+tr.izin td, tr.sakit td, tr.cuti td, tr.dinas td { color: var(--izin); }
+tr.manual td { font-style: italic; }
+td:first-child { white-space: nowrap; }
+table + p { margin-top: 14px; }
+.tanpa-dept .dept { display: none; }
+td.merah { color: var(--merah); font-weight: 600; }
+.tanpa-lembur .lembur { display: none; }
+tr.baru { animation: baru 2.4s ease-out; }
+@keyframes baru { from { background: var(--hijau-muda); } }
+#y-daftar input:not([type]) { width: 100%; }
+
+/* --- kerangka: sidebar + isi ---------------------------------------------------------- */
+.aplikasi { display: grid; grid-template-columns: 216px 1fr; height: 100%; }
+.samping {
+  background: var(--samping); border-right: 1px solid var(--garis); display: flex; flex-direction: column;
+  padding: 18px 12px 14px; overflow-y: auto;
+}
+.merek { display: flex; gap: 10px; align-items: center; padding: 0 8px 18px; }
+.merek img { width: 30px; height: 30px; border-radius: 7px; }
+.merek b { display: block; font-size: 15px; line-height: 1.2; }
+.merek span { display: block; font-size: 12.5px; color: var(--redup); line-height: 1.3; overflow-wrap: anywhere; }
+.samping nav { display: flex; flex-direction: column; gap: 2px; }
+.kelompok { font-size: 12px; color: var(--redup); margin: 16px 10px 4px; }
+.samping nav button {
+  border: 0; background: none; text-align: left; height: 34px; padding: 0 10px; border-radius: 7px; color: var(--redup);
+  font-weight: 550; font-size: 14px; display: flex; align-items: center; justify-content: flex-start; gap: 10px;
+}
+.samping svg { width: 18px; height: 18px; stroke-width: 1.8; flex: none; }
+.samping nav button:hover { background: var(--sorot); color: var(--tinta); }
+.samping nav button[aria-current="page"] { background: var(--hijau-muda); color: var(--hijau); font-weight: 650; }
+.kaki { margin-top: auto; padding: 14px 8px 0; font-size: 12.5px; }
+/* mesin terhubung/semua mesin, di bawah nama aplikasi: hijau = semua terhubung, merah = ada yang terputus */
+#status-samping { display: flex; align-items: center; gap: 6px; margin: 2px 0 1px; font-size: 12px; font-weight: 600; }
+#status-samping::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+#status-samping.ok { color: var(--hijau); } #status-samping.off { color: var(--merah); }
+.kaki button { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.kaki svg { width: 16px; height: 16px; }
+main { overflow-y: auto; background: var(--muka); }
+/* lebar konten: tabel dan kartu melebar sampai 1600 px (layar 1080p sampai 4K); daftar hadir Riwayat
+   memakai seluruh lebar supaya lebih banyak tanggal terlihat. Form tetap sempit (.sempit, .blok .isi). */
+main > section { padding: 26px 32px 48px; max-width: 1600px; }
+main > section#riwayat { max-width: none; }
+@media (max-height: 720px) { main > section { padding-top: 18px; } } /* layar 720p: sisakan tinggi untuk isi */
+.kepala { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 0 0 18px; }
+.kepala p { margin: 0; color: var(--redup); }
