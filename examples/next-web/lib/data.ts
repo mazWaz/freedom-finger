@@ -66,9 +66,8 @@ export function people(data: AppData, users: MachineUser[]) {
     /** Jadwal lain yang dipilih untuk karyawan ini; `undefined` = jadwal utama. */
     scheduleOf,
     scheduleName: (pin: string) => scheduleOf(pin)?.name ?? 'Utama',
-    /** Jarak minimal masuk–pulang (menit) untuk PIN ini di tanggal ini; hari jam bebas 0: scan kedua sudah pulang. */
-    minGapOf: (pin: string, date: string) =>
-      !data.holidays.some((h) => h.date === date) && (scheduleOf(pin) ?? data.schedule).days[weekday(date)]?.free ? 0 : data.schedule.minGap,
+    /** Jadwal PIN ini di tanggal ini: `{start, end}`, `{free: true}` (jam bebas), atau `null` (libur, juga tanggal libur kantor). */
+    shiftOn: (pin: string, date: string) => (data.holidays.some((h) => h.date === date) ? null : (scheduleOf(pin) ?? data.schedule).days[weekday(date)]),
     isRemoved,
     usedPins,
     /** Semua karyawan: dari mesin dan dari isian aplikasi, kecuali yang dihapus dari mesin. */

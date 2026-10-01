@@ -32,7 +32,7 @@ export const matches = (app: App, q: string) => (pin: string) => !q || pin.inclu
  * mesin sendiri menurut jam. Satu mesin dipilih: dihitung dari scan mesin itu saja.
  */
 export function rolesOf(app: App, list: Scan[]) {
-  const roles = scanRoles(list, app.minGapOf);
+  const roles = scanRoles(list, app.data.schedule.minGap, app.shiftOn);
   return (l: Scan) => roles.get(`${l.pin} ${l.scan_date}`) ?? '';
 }
 export const verify = (l: Scan) => (l.manual ? 'Manual' : (VERIFY[String(l.verify)] ?? String(l.verify)));
@@ -41,24 +41,26 @@ export const shortDate = (date: string) => `${Number(date.slice(8))} ${monthName
 /** Lama terlambat singkat untuk sel: 45 -> "+45", 67 -> "+1j07", 120 -> "+2j" (menit besar sulit dibaca). */
 export const lateText = (m: number) => (m < 60 ? `+${m}` : `+${Math.floor(m / 60)}j${m % 60 ? String(m % 60).padStart(2, '0') : ''}`);
 
-function cell(d: RecapDay | undefined, isToday: boolean, isManual: (t: string) => boolean): Cell {
+function cell(d: RecapDay | undefined, isToday: boolean, isManual: (m: number) => boolean): Cell {
   if (!d) return { kind: '', text: '', about: '' };
   if (LEAVE_KINDS.includes(d.status as LeaveKind)) return { kind: 'izin', text: LABEL[d.status], about: LABEL[d.status] };
   if (d.status === 'alpa') return isToday ? { kind: '', text: '', about: 'belum scan' } : { kind: 'alpa', text: 'Alpa', about: 'tidak masuk' };
+  if (d.in == null && d.out != null && d.status === 'hadir') return { kind: '', text: `pulang ${hhmm(d.out)}`, about: `pulang ${hhmm(d.out)} dari masuk kemarin (jam bebas)` };
   if (d.in == null) return { kind: 'libur', text: '', about: `libur${d.note ? `: ${d.note}` : ''}` };
   const out = d.out != null ? hhmm(d.out) : d.noOut && !isToday ? '?' : '';
   const lateLong = d.late < 60 ? `${d.late} menit` : `${Math.floor(d.late / 60)} jam${d.late % 60 ? ` ${d.late % 60} menit` : ''}`;
   const about = [`masuk ${hhmm(d.in)}`, d.late && `terlambat ${lateLong}`, out === '?' ? 'tanpa absen pulang' : out && `pulang ${out}`,
     d.early && `${d.early} menit sebelum jam pulang`, d.status === 'libur' && 'di hari libur'].filter(Boolean).join(', ');
   return { kind: d.status === 'libur' ? 'libur' : d.late ? 'telat' : '', in: hhmm(d.in), out, late: d.late, early: d.early,
-    manualIn: isManual(hhmm(d.in)), manualOut: d.out != null && isManual(out), about };
+    manualIn: isManual(d.in), manualOut: d.out != null && isManual(d.out), about };
 }
 
 /** Karyawan yang cocok dengan pencarian (urut nama), tanggal urut sampai hari ini, dan isi tiap sel. */
 export function sheet(app: App, scans: Scan[], from: string, to: string, q: string) {
   const now = today();
   const last = to < now ? to : now;
-  const pins = [...new Set([...app.knownPins(), ...scans.map((s) => s.pin)])].filter((pin) => app.inRecap(pin)).filter(matches(app, q))
+  const inRange = scans.filter((s) => from <= s.scan_date && s.scan_date.slice(0, 10) <= to);
+  const pins = [...new Set([...app.knownPins(), ...inRange.map((s) => s.pin)])].filter((pin) => app.inRecap(pin)).filter(matches(app, q))
     .sort((a, b) => app.nameOf(a).localeCompare(app.nameOf(b), 'id'));
   const days = new Map<string, RecapDay>(); // "PIN tanggal" -> hari dari recap(); hari ini ikut dihitung (until = besok)
   const dates: string[] = [];
@@ -71,7 +73,9 @@ export function sheet(app: App, scans: Scan[], from: string, to: string, q: stri
     pins,
     dates,
     now,
-    cell: (pin: string, date: string) => cell(days.get(`${pin} ${date}`), date === now, (t) => manual.has(`${pin} ${date} ${t}`)),
+    // menit ke atas 1440 = pulang besoknya (jam bebas lewat tengah malam): koreksinya bertanggal besok
+    cell: (pin: string, date: string) =>
+      cell(days.get(`${pin} ${date}`), date === now, (m) => manual.has(m >= 1440 ? `${pin} ${addDays(date, 1)} ${hhmm(m - 1440)}` : `${pin} ${date} ${hhmm(m)}`)),
   };
 }
 export type Sheet = ReturnType<typeof sheet>;

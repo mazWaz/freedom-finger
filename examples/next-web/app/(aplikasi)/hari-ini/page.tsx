@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '@/components/aplikasi';
 import { useCatatan } from '@/components/form-catatan';
 import { dayName, monthName, today } from '@/lib/format';
-import { correctionScans } from '@/lib/rekap';
+import { LOOKBACK_DAYS, addDays, correctionScans, overnight } from '@/lib/rekap';
 import type { Scan } from '@/lib/types';
 import { DaftarScan } from './daftar-scan';
 import { LaciOrang } from './laci-orang';
@@ -41,15 +41,17 @@ export default function HariIni() {
   const [machine, setMachine] = useState<Scan[] | null>(null);
   useEffect(() => {
     let alive = true;
-    logs(day, day).then((list) => alive && setMachine(list), () => {});
+    logs(addDays(day, -LOOKBACK_DAYS), day).then((list) => alive && setMachine(list), () => {}); // beberapa hari: pulang jam bebas lewat tengah malam
     return () => {
       alive = false;
     };
   }, [logs, day, logsTick]);
-  const rows = useMemo(
-    () => machine && [...machine, ...correctionScans(data.corrections, day, day)].sort((a, b) => b.scan_date.localeCompare(a.scan_date)),
+  /** Scan beberapa hari terakhir (untuk overnight dan arti scan) dan scan hari ini saja, terbaru dulu. */
+  const recent = useMemo(
+    () => machine && [...machine, ...correctionScans(data.corrections, addDays(day, -LOOKBACK_DAYS), day)].sort((a, b) => b.scan_date.localeCompare(a.scan_date)),
     [machine, data.corrections, day],
   );
+  const rows = useMemo(() => recent && recent.filter((l) => l.scan_date.startsWith(day)), [recent, day]);
 
   // scan yang belum pernah tampil sejak halaman dibuka: disorot sebentar
   const shown = useRef<Set<string> | null>(null);
@@ -61,7 +63,10 @@ export default function HariIni() {
     setFresh((f) => ({ keys: new Set(added.map(scanKey)), pins: new Set(added.map((l) => l.pin)), n: f.n + 1 }));
   }, [rows]);
 
-  const { people, holiday } = useMemo(() => (rows ? buildPeople(app, rows, day) : { people: null, holiday: undefined }), [app, rows, day]);
+  const { people, holiday } = useMemo(
+    () => (rows && recent ? buildPeople(app, rows, day, overnight(recent, app.shiftOn)) : { people: null, holiday: undefined }),
+    [app, rows, recent, day],
+  );
   const dots = new Map((people ?? []).filter((p) => p.scans.length).map((p) => [p.pin, p.scans.map((x) => x.m)]));
   const late = new Set((people ?? []).filter((p) => p.kind === 'telat').map((p) => p.pin));
   const [open, setOpen] = useState<string | null>(null);
@@ -103,7 +108,7 @@ export default function HariIni() {
       {/* titik = satu scan; arahkan kursor untuk nama. Isinya sama dengan tabel di bawah, jadi disembunyikan dari pembaca layar */}
       <Pita scans={dots} day={day} late={late} now={now} />
       <Papan people={people} holiday={holiday} fresh={fresh} onOpen={setOpen} />
-      <DaftarScan rows={rows ?? []} fresh={fresh} />
+      <DaftarScan rows={rows ?? []} recent={recent ?? []} fresh={fresh} />
       <p id="isian" className="muted kecil" style={{ marginTop: 20 }} hidden={allOn}>
         Isian di mesin (Menu → Jaringan): Mode Internet, Server IP {ip}, Server Port {status.port}, Server Req Ya.
       </p>

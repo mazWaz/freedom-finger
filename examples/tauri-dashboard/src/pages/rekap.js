@@ -4,7 +4,7 @@ import { firstScans, logs } from '../lib/api.js';
 import { byPin, data, deptOf, inRecap, isRemoved, knownPins, nameOf, scheduleName, scheduleOf } from '../lib/data.js';
 import { exportCsv, exportXlsx, print, reportTitle } from '../lib/export.js';
 import { dayName, dmy, duration, hhmm, lastMonths, longDate, monthName, monthRange, today } from '../lib/format.js';
-import { LEAVE_KINDS, addDays, correctionScans, recap } from '../lib/hitung-rekap.js';
+import { LEAVE_KINDS, LOOKBACK_DAYS, addDays, correctionScans, recap } from '../lib/hitung-rekap.js';
 import { $, esc } from '../lib/ui.js';
 import { openForm } from './izin.js';
 import { CalendarClock, Clock, createElement } from 'lucide';
@@ -67,14 +67,16 @@ export async function show(reason) {
   const [from, to] = [$('k-dari').value, $('k-sampai').value];
   if (reason === 'open' || reason === 'logs' || loaded !== `${from} ${to}`) {
     const my = ++seq;
-    const list = from && to && from <= to ? await logs(from, to) : [];
+    // ditambah tepinya: masuk jam bebas sebelum rentang yang pulangnya di rentang, dan pulang sehari sesudahnya
+    const list = from && to && from <= to ? await logs(addDays(from, -LOOKBACK_DAYS), addDays(to, 1)) : [];
     if (my !== seq) return;
     scans = list;
     loaded = `${from} ${to}`;
   }
-  const all = [...scans, ...correctionScans(data.corrections, from, to)]; // koreksi manual dihitung sebagai scan
+  const all = [...scans, ...correctionScans(data.corrections, addDays(from, -LOOKBACK_DAYS), addDays(to, 1))]; // koreksi manual dihitung sebagai scan
   // karyawan yang dikenal ditambah PIN yang punya scan, kecuali yang tidak ikut rekap
-  const pins = [...new Set([...knownPins(), ...all.map((s) => s.pin)])].filter(inRecap).sort(byPin);
+  const pins = [...new Set([...knownPins(), ...all.filter((s) => from <= s.scan_date && s.scan_date.slice(0, 10) <= to).map((s) => s.pin)])]
+    .filter(inRecap).sort(byPin);
   result = !(from && to) ? [] : recapAll(all, pins, from, to).sort((a, b) => byPin(a.pin, b.pin));
   render();
 }
@@ -130,6 +132,8 @@ function note(d, pin) {
     ...data.corrections.filter((c) => c.pin === pin && c.date === d.date).sort((a, b) => a.time.localeCompare(b.time))
       .map((c) => `Manual ${c.time}: ${c.reason}`),
     d.noOut && 'Lupa absen pulang',
+    d.out >= 1440 && 'Pulang besoknya (jam bebas)',
+    d.in == null && d.out != null && 'Pulang dari masuk kemarin (jam bebas)',
     d.status === 'libur' && d.in != null && d.out == null && 'Scan di hari libur tanpa pulang',
     d.status === 'libur' && d.overtime && 'Lembur hari libur',
   ].filter(Boolean).join('; ');

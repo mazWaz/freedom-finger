@@ -12,11 +12,14 @@ import { PilihRentang } from '@/components/tanggal';
 import { useUi } from '@/components/ui';
 import { exportCsv, exportXlsx, reportTitle } from '@/lib/export';
 import { ranges } from '@/lib/format';
-import { correctionScans } from '@/lib/rekap';
+import { LOOKBACK_DAYS, addDays, correctionScans } from '@/lib/rekap';
 import type { Scan } from '@/lib/types';
 import { Log } from './log';
 import { Matriks } from './matriks';
 import { logTable, matches, sheet, sheetTable } from './tabel';
+
+/** Rentang yang diambil: beberapa hari sebelum (masuk jam bebas yang pulangnya di rentang) sampai sehari sesudah. */
+const wide = (from: string, to: string) => [addDays(from, -LOOKBACK_DAYS), addDays(to, 1)] as const;
 
 export default function Riwayat() {
   const app = useApp();
@@ -27,7 +30,7 @@ export default function Riwayat() {
   const [view, setView] = useState<'hari' | 'scan'>('hari'); // 'hari' = daftar hadir per hari, 'scan' = semua scan
   const [picked, setPicked] = useState(''); // mesin terpilih; hanya di tampilan Semua scan
   const [page, setPage] = useState(1);
-  const [rows, setRows] = useState<Scan[]>([]); // hasil get_attlog untuk rentang terpilih, terbaru dulu
+  const [rows, setRows] = useState<Scan[]>([]); // hasil get_attlog untuk rentang terpilih ditambah tepinya (wide), terbaru dulu
   const [loaded, setLoaded] = useState(''); // rentang yang log-nya sudah tampil
   const seq = useRef(0); // hanya jawaban permintaan terakhir yang dipakai (ganti rentang cepat-cepat)
   const { devices, logs, logsTick } = app;
@@ -37,7 +40,7 @@ export default function Riwayat() {
   useEffect(() => {
     if (!from || !to) return;
     const my = ++seq.current;
-    (from <= to ? logs(from, to, machine || undefined) : Promise.resolve([])).then(
+    (from <= to ? logs(...wide(from, to), machine || undefined) : Promise.resolve([])).then(
       (list) => {
         if (my !== seq.current) return;
         setRows(list.sort((a, b) => b.scan_date.localeCompare(a.scan_date)));
@@ -47,19 +50,20 @@ export default function Riwayat() {
     );
   }, [from, to, machine, logs, logsTick, notify]);
 
-  /** Scan mesin ditambah koreksi manual, terbaru dulu. */
-  const every = useMemo(
-    () => (machine ? rows : [...rows, ...correctionScans(app.data.corrections, from, to)].sort((a, b) => b.scan_date.localeCompare(a.scan_date))),
+  /** Scan mesin ditambah koreksi manual, terbaru dulu: `all` termasuk tepi rentang (hitungan), `every` hanya rentang ini. */
+  const all = useMemo(
+    () => (machine ? rows : [...rows, ...correctionScans(app.data.corrections, ...wide(from, to))].sort((a, b) => b.scan_date.localeCompare(a.scan_date))),
     [machine, rows, app.data.corrections, from, to],
   );
+  const every = useMemo(() => all.filter((l) => from <= l.scan_date && l.scan_date.slice(0, 10) <= to), [all, from, to]);
   const query = q.trim().toLowerCase();
   const list = useMemo(() => {
     const match = matches(app, query);
     return every.filter((l) => match(l.pin));
   }, [app, every, query]);
-  const grid = useMemo(() => (view === 'hari' ? sheet(app, every, from, to, query) : null), [app, view, every, from, to, query]);
+  const grid = useMemo(() => (view === 'hari' ? sheet(app, all, from, to, query) : null), [app, view, all, from, to, query]);
 
-  const current = () => (grid ? sheetTable(app, grid, from, to) : logTable(app, every, list, from, to));
+  const current = () => (grid ? sheetTable(app, grid, from, to) : logTable(app, all, list, from, to));
   const file = `riwayat-absen-${from}_${to}`;
   async function xlsx() {
     const err = await exportXlsx(`${file}.xlsx`, [current()]);
@@ -127,7 +131,7 @@ export default function Riwayat() {
       {grid ? (
         <Matriks sheet={grid} range={loaded} q={q.trim()} onCell={(pin, date) => catatan.open('corrections', { pin, date })} />
       ) : (
-        <Log every={every} list={list} page={page} onPage={setPage} />
+        <Log all={all} every={every} list={list} page={page} onPage={setPage} />
       )}
       {catatan.laci}
     </section>

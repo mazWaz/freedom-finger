@@ -2,7 +2,8 @@
 // aplikasi lain. Aturannya sama dengan PRD Feature 7, bagian Recap rules:
 // - tombol Masuk/Pulang di mesin diabaikan; scan pertama hari itu = masuk
 // - scan terakhir = pulang, bila berjarak minimal `minGap` menit dari masuk (lebih dekat = scan ganda);
-//   hari jam bebas: scan terakhir selalu pulang, berapa pun jaraknya
+//   hari jam bebas: scan terakhir selalu pulang, berapa pun jaraknya; masuk tanpa pulang = scan berikutnya
+//   dalam 24 jam (hari lain) jadi pulangnya, dicatat sebagai menit sesudah 24:00 (overnight)
 // - menit terlambat dihitung dari jam masuk, bukan dari akhir toleransi
 // - hari ini dan sesudahnya belum dihitung
 // Semua jam dalam menit sejak 00:00; detik diabaikan.
@@ -27,24 +28,57 @@ export const correctionScans = (corrections, from, to) => corrections
   .map((c) => ({ pin: c.pin, scan_date: `${c.date} ${c.time}:00`, manual: true, reason: c.reason }));
 
 /**
+ * Ambil scan sejak sekian hari sebelum rentang (dan sehari sesudahnya) supaya overnight() benar di tepi rentang.
+ * ponytail: rantai masuk-pulang lewat malam yang lebih panjang dari ini salah di awal rentang; perpanjang bila perlu.
+ */
+export const LOOKBACK_DAYS = 7;
+
+/** "YYYY-MM-DD hh:mm:ss" -> menit sejak 1970 (jam dinding; detik diabaikan) */
+const stamp = (s) => Date.parse(`${s.slice(0, 10)}T${s.slice(11, 16)}:00Z`) / 60_000;
+
+/**
+ * Jam bebas lewat tengah malam: hari jam bebas yang hanya punya masuk (satu scan), lalu scan berikutnya dalam
+ * 24 jam di hari lain = pulang hari itu, kecuali hari scan itu hari kerja berjam (scannya tetap masuk hari itu).
+ * `shiftOn(pin, tanggal)` = jadwal hari itu (`null` = libur). Hasil: "PIN scan_date" -> tanggal masuknya.
+ */
+export function overnight(scans, shiftOn) {
+  const perPin = new Map();
+  for (const s of scans) perPin.set(s.pin, [...(perPin.get(s.pin) ?? []), s.scan_date]);
+  const carried = new Map();
+  for (const [pin, list] of perPin) {
+    list.sort();
+    let open = null; // masuk hari jam bebas yang belum punya pulang
+    for (let i = 0; i < list.length; ) {
+      const date = list[i].slice(0, 10);
+      const day = [];
+      while (i < list.length && list[i].startsWith(date)) day.push(list[i++]);
+      if (open && stamp(day[0]) - stamp(open) <= 1440 && !shiftOn(pin, date)?.start) carried.set(`${pin} ${day.shift()}`, open.slice(0, 10));
+      open = day.length === 1 && shiftOn(pin, date)?.free ? day[0] : null;
+    }
+  }
+  return carried;
+}
+
+/**
  * Arti tiap scan menurut aturan rekap, bukan tombol Masuk/Pulang di mesin (mesin mengganti tombol sendiri
  * menurut jam, mis. semua scan sebelum 09:00 tercatat "Pulang"): scan pertama per orang per hari = Masuk,
- * scan terakhir = Pulang bila minimal `gapOf(pin, tanggal)` menit sesudahnya (`minGap`; jam bebas 0),
- * sisanya tidak dihitung.
+ * scan terakhir = Pulang bila minimal `minGap` menit sesudahnya (hari jam bebas: berapa pun), dan pulang
+ * jam bebas lewat tengah malam (overnight); sisanya tidak dihitung.
  * Hasil: "PIN YYYY-MM-DD hh:mm:ss" -> 'Masuk' | 'Pulang'.
  */
-export function scanRoles(scans, gapOf) {
+export function scanRoles(scans, minGap, shiftOn) {
+  const carried = overnight(scans, shiftOn);
+  const roles = new Map();
   const perDay = new Map();
   for (const s of scans) {
-    const k = `${s.pin} ${s.scan_date.slice(0, 10)}`;
-    perDay.set(k, [...(perDay.get(k) ?? []), s.scan_date]);
+    if (carried.has(`${s.pin} ${s.scan_date}`)) roles.set(`${s.pin} ${s.scan_date}`, 'Pulang');
+    else perDay.set(`${s.pin} ${s.scan_date.slice(0, 10)}`, [...(perDay.get(`${s.pin} ${s.scan_date.slice(0, 10)}`) ?? []), s.scan_date]);
   }
-  const roles = new Map();
   for (const [k, list] of perDay) {
     const pin = k.slice(0, k.indexOf(' '));
     list.sort();
     roles.set(`${pin} ${list[0]}`, 'Masuk');
-    const gap = gapOf(pin, list[0].slice(0, 10));
+    const gap = shiftOn(pin, list[0].slice(0, 10))?.free ? 0 : minGap;
     if (list.length > 1 && minutes(list.at(-1), 11) - minutes(list[0], 11) >= gap) roles.set(`${pin} ${list.at(-1)}`, 'Pulang');
   }
   return roles;
@@ -115,25 +149,33 @@ export const weekday = (date) => new Date(`${date}T00:00:00Z`).getUTCDay();
  * @param {Record<string, string>} [o.ends]  PIN -> tanggal terakhir (dihapus dari mesin); hari sesudahnya tidak dihitung
  */
 export function recap({ scans, pins, schedule, holidays = [], leaves = [], from, to, today, starts = {}, ends = {} }) {
-  const times = new Map(); // "pin tanggal" -> menit scan
-  for (const s of scans) {
-    const k = `${s.pin} ${s.scan_date.slice(0, 10)}`;
-    if (!times.has(k)) times.set(k, []);
-    times.get(k).push(minutes(s.scan_date, 11));
-  }
   const off = new Map(holidays.map((h) => [h.date, h.note ?? '']));
+  const shiftOn = (pin, date) => (off.has(date) ? null : schedule.days[weekday(date)]);
+  const mine = new Set(pins);
+  const carried = overnight(scans.filter((s) => mine.has(s.pin)), shiftOn);
+  const times = new Map(); // "pin tanggal" -> menit scan; pulang lewat tengah malam: menit + 1440 di hari masuknya
+  const back = new Map(); // "pin tanggal" -> menit pulang dari masuk kemarin (jam bebas lewat tengah malam)
+  for (const s of scans) {
+    const date = s.scan_date.slice(0, 10);
+    const from = carried.get(`${s.pin} ${s.scan_date}`);
+    const k = `${s.pin} ${from ?? date}`;
+    if (!times.has(k)) times.set(k, []);
+    times.get(k).push(minutes(s.scan_date, 11) + (from ? 1440 : 0));
+    if (from) back.set(`${s.pin} ${date}`, minutes(s.scan_date, 11));
+  }
   const dates = [];
   for (let d = from; d <= to && d < today; d = addDays(d, 1)) dates.push(d);
   return pins.map((pin) => {
     const days = dates.filter((date) => (!starts[pin] || date >= starts[pin]) && (!ends[pin] || date <= ends[pin])).map((date) => {
       const leave = leaves.find((l) => l.pin === pin && l.from <= date && date <= l.to)?.kind;
-      return day(date, times.get(`${pin} ${date}`) ?? [], off.has(date) ? null : schedule.days[weekday(date)], schedule, leave, off.get(date));
+      return day(date, times.get(`${pin} ${date}`) ?? [], shiftOn(pin, date), schedule, leave, off.get(date), back.get(`${pin} ${date}`));
     });
     return { pin, days, total: total(days) };
   });
 }
 
-function day(date, scans, shift, s, leave, holiday) {
+/** `back` = menit pulang hari ini dari masuk kemarin (jam bebas lewat tengah malam), bila ada. */
+function day(date, scans, shift, s, leave, holiday, back) {
   const t = [...scans].sort((a, b) => a - b);
   const first = t[0];
   const gap = shift?.free ? 0 : s.minGap; // jam bebas: scan kedua sudah pulang
@@ -141,6 +183,7 @@ function day(date, scans, shift, s, leave, holiday) {
   const ot = s.overtime?.[weekday(date)] !== false; // tanggal libur kantor ikut sakelar hari itu
   const d = { date, work: !!shift, in: first ?? null, out, status: 'hadir', late: 0, early: 0, noOut: false, hours: 0, overtime: 0, note: holiday ?? '' };
   if (first !== undefined && out !== null) d.hours = out - first;
+  if (first === undefined && back != null) d.out = back; // hanya pulang dari masuk kemarin; jamnya dihitung di hari masuk
   if (!shift) {
     // libur: tanpa scan = libur; masuk dan pulang = seluruh jam kerja jadi lembur hari libur
     d.status = 'libur';
@@ -149,7 +192,7 @@ function day(date, scans, shift, s, leave, holiday) {
     d.status = leave; // bukan alpa walau ada scan
     d.hours = 0;
   } else if (first === undefined) {
-    d.status = 'alpa';
+    if (back == null) d.status = 'alpa'; // ada pulang dari masuk kemarin: hadir
   } else if (shift.free) {
     d.noOut = out === null; // jam bebas: tidak ada terlambat, pulang cepat, atau lembur
   } else {

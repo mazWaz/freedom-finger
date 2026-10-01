@@ -3,8 +3,8 @@ import { addDays, addMonths, weekday } from './rekap';
 
 export const today = () => new Date().toLocaleDateString('sv'); // YYYY-MM-DD, jam komputer ini
 export const pad = (n: number) => String(n).padStart(2, '0');
-/** menit -> "08:05" */
-export const hhmm = (m: number | null | undefined) => (m == null ? '' : `${pad(Math.floor(m / 60))}:${pad(m % 60)}`);
+/** menit -> "08:05"; 1440 ke atas = besoknya (pulang jam bebas lewat tengah malam): "01:55 (+1)" */
+export const hhmm = (m: number | null | undefined) => (m == null ? '' : `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}${m >= 1440 ? ' (+1)' : ''}`);
 /** lama dalam menit -> "8:05" (jam:menit), kosong bila 0 */
 export const duration = (m: number) => (m ? `${Math.floor(m / 60)}:${pad(m % 60)}` : '');
 export const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];

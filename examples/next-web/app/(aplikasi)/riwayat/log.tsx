@@ -9,10 +9,10 @@ import { rolesOf, verify } from './tabel';
 
 const PER_PAGE = 50;
 
-/** `every` = semua scan rentang ini (untuk arti scan), `list` = yang cocok dengan pencarian. */
-export function Log({ every, list, page, onPage }: { every: Scan[]; list: Scan[]; page: number; onPage: (n: number) => void }) {
+/** `all` = scan termasuk tepi rentang (untuk arti scan), `every` = scan rentang ini, `list` = yang cocok dengan pencarian. */
+export function Log({ all, every, list, page, onPage }: { all: Scan[]; every: Scan[]; list: Scan[]; page: number; onPage: (n: number) => void }) {
   const app = useApp();
-  const role = rolesOf(app, every);
+  const role = rolesOf(app, all);
   const manual = list.filter((l) => l.manual).length;
   const [, n] = pageOf(list, page, PER_PAGE);
   const [first, end] = [(n - 1) * PER_PAGE, n * PER_PAGE];

@@ -6,16 +6,16 @@
 // Koreksi absen (izin.js) ikut dihitung dan bertanda "manual", kecuali saat satu mesin dipilih. Klik sel daftar
 // hadir = form koreksi untuk orang dan tanggal itu (lupa absen masuk atau pulang).
 import { devices, logs } from '../lib/api.js';
-import { data, inRecap, knownPins, minGapOf, nameOf } from '../lib/data.js';
+import { data, inRecap, knownPins, nameOf, shiftOn } from '../lib/data.js';
 import { exportCsv, exportXlsx, print, reportTitle } from '../lib/export.js';
 import { dayName, hhmm, longDate, monthName, ranges, today } from '../lib/format.js';
-import { LEAVE_KINDS, addDays, correctionScans, minutes, scanRoles } from '../lib/hitung-rekap.js';
+import { LEAVE_KINDS, LOOKBACK_DAYS, addDays, correctionScans, minutes, scanRoles } from '../lib/hitung-rekap.js';
 import { $, esc, paginate } from '../lib/ui.js';
 import { VERIFY } from './hari-ini.js';
 import { openForm } from './izin.js';
 import { LABEL, recapAll } from './rekap.js';
 
-let rows = []; // hasil get_attlog untuk rentang terpilih, terbaru dulu
+let rows = []; // hasil get_attlog untuk rentang terpilih ditambah tepinya (wide), terbaru dulu
 let loaded = ''; // rentang + mesin yang sudah diambil
 let seq = 0; // hanya jawaban permintaan terakhir yang dipakai (ganti rentang cepat-cepat)
 let view = 'hari'; // 'hari' = daftar hadir per hari, 'scan' = semua scan
@@ -68,7 +68,7 @@ export async function show(reason) {
   const want = `${from} ${to} ${machine()}`;
   if (from && to && (reason === 'open' || reason === 'logs' || loaded !== want)) {
     const my = ++seq;
-    const list = from <= to ? await logs(from, to, machine()) : [];
+    const list = from <= to ? await logs(...wide(from, to), machine()) : [];
     if (my !== seq) return;
     rows = list.sort((a, b) => b.scan_date.localeCompare(a.scan_date));
     loaded = want;
@@ -76,14 +76,19 @@ export async function show(reason) {
   render();
 }
 
-/** Scan mesin ditambah koreksi manual, terbaru dulu. */
+/** Rentang yang diambil: beberapa hari sebelum (masuk jam bebas yang pulangnya di rentang) sampai sehari sesudah. */
+const wide = (from, to) => [addDays(from, -LOOKBACK_DAYS), addDays(to, 1)];
+
+/** Scan mesin ditambah koreksi manual, terbaru dulu, termasuk tepi rentang (untuk hitungan). */
 function all() {
   if (machine()) return rows;
-  return [...rows, ...correctionScans(data.corrections, $('r-dari').value, $('r-sampai').value)].sort((a, b) => b.scan_date.localeCompare(a.scan_date));
+  return [...rows, ...correctionScans(data.corrections, ...wide($('r-dari').value, $('r-sampai').value))].sort((a, b) => b.scan_date.localeCompare(a.scan_date));
 }
+/** Hanya scan di rentang terpilih (untuk tampilan). */
+const inRange = (list) => list.filter((l) => $('r-dari').value <= l.scan_date && l.scan_date.slice(0, 10) <= $('r-sampai').value);
 
 /** Baris yang cocok dengan pencarian nama atau PIN. */
-function visible(list = all()) {
+function visible(list) {
   const q = $('r-cari').value.trim().toLowerCase();
   return q ? list.filter((l) => l.pin.includes(q) || nameOf(l.pin).toLowerCase().includes(q)) : list;
 }
@@ -93,7 +98,7 @@ function visible(list = all()) {
  * mesin sendiri menurut jam. Satu mesin dipilih: dihitung dari scan mesin itu saja.
  */
 const rolesOf = (list) => {
-  const roles = scanRoles(list, minGapOf);
+  const roles = scanRoles(list, data.schedule.minGap, shiftOn);
   return (l) => roles.get(`${l.pin} ${l.scan_date}`) ?? '';
 };
 const verify = (l) => (l.manual ? 'Manual' : (VERIFY[l.verify] ?? String(l.verify)));
@@ -101,9 +106,9 @@ const verify = (l) => (l.manual ? 'Manual' : (VERIFY[l.verify] ?? String(l.verif
 const render = () => (view === 'hari' ? renderSheet() : renderLog());
 
 function renderLog() {
-  const every = all();
+  const every = inRange(all());
   const list = visible(every);
-  const role = rolesOf(every);
+  const role = rolesOf(all());
   const manual = list.filter((l) => l.manual).length;
   $('r-info').innerHTML = `<span><b>${list.length}</b> scan${list.length === every.length ? '' : ` dari ${every.length}`}</span>` +
     (manual ? `<span><b>${manual}</b> koreksi manual</span>` : '');
@@ -149,7 +154,7 @@ function table() {
       { title: 'Mesin', kind: 'text', width: 20 },
       { title: 'Keterangan', kind: 'text', width: 30 },
     ],
-    rows: visible().map((l) => [l.scan_date.slice(0, 10), minutes(l.scan_date, 11), nameOf(l.pin), l.pin, role(l), verify(l), l.cloud_id, l.reason]),
+    rows: visible(inRange(all())).map((l) => [l.scan_date.slice(0, 10), minutes(l.scan_date, 11), nameOf(l.pin), l.pin, role(l), verify(l), l.cloud_id, l.reason]),
   };
 }
 
@@ -162,7 +167,7 @@ function sheet() {
   const last = to < now ? to : now;
   const scans = all();
   const q = $('r-cari').value.trim().toLowerCase();
-  const pins = [...new Set([...knownPins(), ...scans.map((s) => s.pin)])].filter(inRecap)
+  const pins = [...new Set([...knownPins(), ...inRange(scans).map((s) => s.pin)])].filter(inRecap)
     .filter((pin) => !q || pin.includes(q) || nameOf(pin).toLowerCase().includes(q))
     .sort((a, b) => nameOf(a).localeCompare(nameOf(b), 'id'));
   const days = new Map(); // "PIN tanggal" -> hari dari recap(); hari ini ikut dihitung (until = besok)
@@ -172,7 +177,9 @@ function sheet() {
     for (let d = from; d <= last; d = addDays(d, 1)) dates.push(d);
   }
   const manual = new Set(data.corrections.map((c) => `${c.pin} ${c.date} ${c.time}`));
-  return { pins, dates, now, cell: (pin, date) => cell(days.get(`${pin} ${date}`), date === now, (t) => manual.has(`${pin} ${date} ${t}`)) };
+  // menit ke atas 1440 = pulang besoknya (jam bebas lewat tengah malam): koreksinya bertanggal besok
+  const isManual = (pin, date) => (m) => manual.has(m >= 1440 ? `${pin} ${addDays(date, 1)} ${hhmm(m - 1440)}` : `${pin} ${date} ${hhmm(m)}`);
+  return { pins, dates, now, cell: (pin, date) => cell(days.get(`${pin} ${date}`), date === now, isManual(pin, date)) };
 }
 
 /**
@@ -183,13 +190,14 @@ function cell(d, isToday, isManual) {
   if (!d) return { kind: '', text: '', about: '' };
   if (LEAVE_KINDS.includes(d.status)) return { kind: 'izin', text: LABEL[d.status], about: LABEL[d.status] };
   if (d.status === 'alpa') return isToday ? { kind: '', text: '', about: 'belum scan' } : { kind: 'alpa', text: 'Alpa', about: 'tidak masuk' };
+  if (d.in == null && d.out != null && d.status === 'hadir') return { kind: '', text: `pulang ${hhmm(d.out)}`, about: `pulang ${hhmm(d.out)} dari masuk kemarin (jam bebas)` };
   if (d.in == null) return { kind: 'libur', text: '', about: `libur${d.note ? `: ${d.note}` : ''}` };
   const out = d.out != null ? hhmm(d.out) : d.noOut && !isToday ? '?' : '';
   const lateLong = d.late < 60 ? `${d.late} menit` : `${Math.floor(d.late / 60)} jam${d.late % 60 ? ` ${d.late % 60} menit` : ''}`;
   const about = [`masuk ${hhmm(d.in)}`, d.late && `terlambat ${lateLong}`, out === '?' ? 'tanpa absen pulang' : out && `pulang ${out}`,
     d.early && `${d.early} menit sebelum jam pulang`, d.status === 'libur' && 'di hari libur'].filter(Boolean).join(', ');
   return { kind: d.status === 'libur' ? 'libur' : d.late ? 'telat' : '', in: hhmm(d.in), out, late: d.late, early: d.early,
-    manualIn: isManual(hhmm(d.in)), manualOut: d.out != null && isManual(out), about };
+    manualIn: isManual(d.in), manualOut: d.out != null && isManual(d.out), about };
 }
 
 const shortDate = (date) => `${Number(date.slice(8))} ${monthName(date).slice(0, 3)}`;

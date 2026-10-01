@@ -12,7 +12,7 @@ import { useUi } from '@/components/ui';
 import { byPin } from '@/lib/data';
 import { exportCsv, exportXlsx } from '@/lib/export';
 import { lastMonths, longDate, monthName, monthRange, today } from '@/lib/format';
-import { addDays, correctionScans } from '@/lib/rekap';
+import { LOOKBACK_DAYS, addDays, correctionScans } from '@/lib/rekap';
 import { recapAll } from '@/lib/rekap-app';
 import type { Scan } from '@/lib/types';
 import { Rincian } from './rincian';
@@ -33,7 +33,8 @@ export default function Rekap() {
 
   useEffect(() => {
     const my = ++seq.current;
-    (from && to && from <= to ? logs(from, to) : Promise.resolve([])).then(
+    // ditambah tepinya: masuk jam bebas sebelum rentang yang pulangnya di rentang, dan pulang sehari sesudahnya
+    (from && to && from <= to ? logs(addDays(from, -LOOKBACK_DAYS), addDays(to, 1)) : Promise.resolve([])).then(
       (list) => my === seq.current && setScans(list),
       (e: Error) => my === seq.current && notify(`Gagal memuat rekap: ${e.message}`, true),
     );
@@ -41,9 +42,10 @@ export default function Rekap() {
 
   const result = useMemo(() => {
     if (!from || !to) return [];
-    const all = [...scans, ...correctionScans(data.corrections, from, to)]; // koreksi manual dihitung sebagai scan
+    const all = [...scans, ...correctionScans(data.corrections, addDays(from, -LOOKBACK_DAYS), addDays(to, 1))]; // koreksi manual dihitung sebagai scan
     // karyawan yang dikenal ditambah PIN yang punya scan, kecuali yang tidak ikut rekap
-    const pins = [...new Set([...app.knownPins(), ...all.map((s) => s.pin)])].filter((pin) => app.inRecap(pin)).sort(byPin);
+    const inRange = all.filter((s) => from <= s.scan_date && s.scan_date.slice(0, 10) <= to);
+    const pins = [...new Set([...app.knownPins(), ...inRange.map((s) => s.pin)])].filter((pin) => app.inRecap(pin)).sort(byPin);
     return recapAll(app, all, pins, from, to).sort((a, b) => byPin(a.pin, b.pin));
   }, [app, data.corrections, scans, from, to]);
 

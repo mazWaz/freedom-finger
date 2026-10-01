@@ -149,7 +149,7 @@ test('arti scan menurut aturan rekap, bukan tombol mesin: datang 07:59 = Masuk',
     { pin: '6', scan_date: '2026-09-30 10:05:00' }, // scan ganda: tidak dihitung
     { pin: '5', scan_date: '2026-09-30 10:00:00' },
     { pin: '5', scan_date: '2026-09-30 10:30:00' }, // kurang dari jarak minimal: bukan pulang
-  ], () => 60);
+  ], 60, () => ({ start: '08:00', end: '17:00' }));
   assert.equal(r.get('8 2026-09-30 07:59:23'), 'Masuk');
   assert.equal(r.get('6 2026-09-30 10:04:00'), 'Masuk');
   assert.equal(r.get('6 2026-09-30 10:05:00'), undefined);
@@ -212,7 +212,29 @@ test('jam bebas: scan kedua sudah pulang walau dekat; satu scan tetap tanpa pula
   assert.equal(day(['16:50', '17:10']).out, null);
   assert.equal(day(['16:50'], { schedule }).noOut, true);
   const r = scanRoles([{ pin: '2', scan_date: '2026-09-30 16:50:14' }, { pin: '2', scan_date: '2026-09-30 17:10:00' },
-    { pin: '3', scan_date: '2026-09-30 16:50:00' }], () => 0);
+    { pin: '3', scan_date: '2026-09-30 16:50:00' }], 60, () => ({ free: true }));
   assert.equal(r.get('2 2026-09-30 17:10:00'), 'Pulang');
   assert.equal(r.get('3 2026-09-30 16:50:00'), 'Masuk'); // satu scan: tetap Masuk walau jarak minimal 0
+});
+
+test('jam bebas lewat tengah malam: scan berikutnya dalam 24 jam = pulang hari masuk', () => {
+  const schedule = { ...DEFAULT_SCHEDULE, days: Array(7).fill({ free: true }) };
+  const o = { schedule, from: '2026-09-30', to: '2026-10-02', today: '2026-10-03' };
+  const [a, b, c] = run([['1', '2026-09-30 16:50'], ['1', '2026-10-01 11:40'], ['1', '2026-10-02 01:55']], o)[0].days;
+  assert.deepEqual([a.in, a.out, a.hours, a.noOut], [hm(16, 50), 1440 + hm(11, 40), hm(18, 50), false]);
+  assert.deepEqual([b.status, b.in, b.out, b.hours, b.noOut], ['hadir', null, hm(11, 40), 0, false]); // hanya pulang dari kemarin
+  assert.deepEqual([c.in, c.out, c.noOut], [hm(1, 55), null, true]);
+  // lebih dari 24 jam: tetap lupa pulang, scan berikutnya masuk hari itu
+  const far = run([['1', '2026-09-30 10:00'], ['1', '2026-10-01 10:01']], o)[0].days;
+  assert.deepEqual([far[0].noOut, far[1].in], [true, hm(10, 1)]);
+  // dua scan di hari masuk: sudah pulang, scan besoknya masuk baru
+  const closed = run([['1', '2026-09-30 10:00'], ['1', '2026-09-30 12:00'], ['1', '2026-10-01 08:00']], o)[0].days;
+  assert.deepEqual([closed[0].out, closed[1].in], [hm(12, 0), hm(8, 0)]);
+  // besoknya hari kerja berjam (Kamis 08:00-17:00): scannya tetap masuk hari itu
+  const mixed = { ...DEFAULT_SCHEDULE, days: DEFAULT_SCHEDULE.days.map((d, i) => (i === 3 ? { free: true as const } : d)) };
+  const [rabu, kamis] = run([['1', '2026-09-30 16:50'], ['1', '2026-10-01 07:55']], { ...o, schedule: mixed })[0].days;
+  assert.deepEqual([rabu.noOut, kamis.in, kamis.status], [true, hm(7, 55), 'hadir']);
+  const r = scanRoles([{ pin: '1', scan_date: '2026-09-30 16:50:00' }, { pin: '1', scan_date: '2026-10-01 11:40:00' },
+    { pin: '1', scan_date: '2026-10-02 01:55:00' }], 60, () => ({ free: true }));
+  assert.deepEqual(['2026-09-30 16:50:00', '2026-10-01 11:40:00', '2026-10-02 01:55:00'].map((t) => r.get(`1 ${t}`)), ['Masuk', 'Pulang', 'Masuk']);
 });

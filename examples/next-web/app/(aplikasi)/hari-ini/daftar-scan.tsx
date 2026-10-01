@@ -11,14 +11,17 @@ import { scanKey } from './orang';
 
 const PER_PAGE = 20;
 
-/** `rows` = scan hari ini, terbaru dulu; `fresh` = scan yang baru masuk sejak pemuatan sebelumnya. */
-export function DaftarScan({ rows, fresh }: { rows: Scan[]; fresh: { keys: Set<string>; n: number } }) {
+/**
+ * `rows` = scan hari ini, terbaru dulu; `recent` = scan beberapa hari terakhir (arti scan, termasuk pulang jam bebas
+ * lewat tengah malam); `fresh` = scan yang baru masuk sejak pemuatan sebelumnya.
+ */
+export function DaftarScan({ rows, recent, fresh }: { rows: Scan[]; recent: Scan[]; fresh: { keys: Set<string>; n: number } }) {
   const app = useApp();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const q = search.trim().toLowerCase();
   const found = rows.filter((l) => !q || l.pin.includes(q) || app.nameOf(l.pin).toLowerCase().includes(q));
-  const roles = scanRoles(rows, app.minGapOf);
+  const roles = scanRoles(recent, app.data.schedule.minGap, app.shiftOn);
   const [list, n] = pageOf(found, page, PER_PAGE);
   return (
     <details className="lipat">

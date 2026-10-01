@@ -17,6 +17,8 @@ export function note(app: App, d: RecapDay, pin: string) {
     leave,
     ...corrections.filter((c) => c.pin === pin && c.date === d.date).sort((a, b) => a.time.localeCompare(b.time)).map((c) => `Manual ${c.time}: ${c.reason}`),
     d.noOut && 'Lupa absen pulang',
+    d.out != null && d.out >= 1440 && 'Pulang besoknya (jam bebas)',
+    d.in == null && d.out != null && 'Pulang dari masuk kemarin (jam bebas)',
     d.status === 'libur' && d.in != null && d.out == null && 'Scan di hari libur tanpa pulang',
     d.status === 'libur' && d.overtime && 'Lembur hari libur',
   ].filter(Boolean).join('; ');

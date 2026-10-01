@@ -6,9 +6,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import { FingerprintPattern, createElement } from 'lucide';
 import { backups, devices, logs, port } from '../lib/api.js';
-import { colorOf, data, deptOf, inRecap, knownPins, minGapOf, nameOf, scheduleName, scheduleOf, scheduleTag } from '../lib/data.js';
+import { colorOf, data, deptOf, inRecap, knownPins, nameOf, scheduleName, scheduleTag, shiftOn } from '../lib/data.js';
 import { dayName, hhmm, monthName, period, today } from '../lib/format.js';
-import { correctionScans, minutes, scanRoles, userPhoto, weekday } from '../lib/hitung-rekap.js';
+import { LOOKBACK_DAYS, addDays, correctionScans, minutes, overnight, scanRoles, userPhoto, weekday } from '../lib/hitung-rekap.js';
 import { $, esc, openDrawer, paginate } from '../lib/ui.js';
 import { openForm } from './izin.js';
 import { LABEL } from './rekap.js';
@@ -25,9 +25,10 @@ function storage(key, value) {
 }
 
 let shown = new Set(); // scan yang sudah tampil: yang baru disorot sebentar
-let people = []; // karyawan di papan: {pin, kind, shift, scans, leave}
+let people = []; // karyawan di papan: {pin, kind, shift, scans, leave, back}
 let filter = 'semua';
 let rows = []; // semua scan hari ini, terbaru dulu
+let recent = []; // scan beberapa hari terakhir sampai hari ini: pulang jam bebas lewat tengah malam (overnight)
 let freshRows = new Set(); // scan yang baru masuk sejak tampilan sebelumnya
 const page = { cards: 1, rows: 1 };
 const PER_PAGE = { cards: 24, rows: 20 };
@@ -82,10 +83,12 @@ export async function show() {
     'lalu minta admin jaringan mereservasi IP komputer ini di router supaya tidak berubah lagi.';
   const day = today();
   $('tanggal').textContent = `${dayName(day)}, ${Number(day.slice(8))} ${monthName(day.slice(0, 7))}`;
-  const list = [...(await logs(day, day)), ...correctionScans(data.corrections, day, day)];
+  const since = addDays(day, -LOOKBACK_DAYS);
+  recent = [...(await logs(since, day)), ...correctionScans(data.corrections, since, day)];
+  const list = recent.filter((l) => l.scan_date.startsWith(day));
   list.sort((a, b) => b.scan_date.localeCompare(a.scan_date));
   const freshList = shown.size ? list.filter((l) => !shown.has(scanKey(l))) : [];
-  build(list, day);
+  build(list, day, overnight(recent, shiftOn));
   render(new Set(freshList.map((l) => l.pin)));
   rows = list;
   freshRows = new Set(freshList.map(scanKey));
@@ -97,7 +100,7 @@ export async function show() {
 function table() {
   const q = $('daftar-cari').value.trim().toLowerCase();
   const found = rows.filter((l) => matches(l.pin, q));
-  const roles = scanRoles(rows, minGapOf); // bukan tombol mesin: sebelum 09:00 mesin selalu mencatat "Pulang"
+  const roles = scanRoles(recent, data.schedule.minGap, shiftOn); // bukan tombol mesin: sebelum 09:00 mesin selalu mencatat "Pulang"
   $('jumlah').textContent = rows.length ? `(${rows.length})` : '';
   const [list, n] = paginate($('daftar-hal'), found, page.rows, PER_PAGE.rows, (n) => {
     page.rows = n;
@@ -111,23 +114,27 @@ function table() {
     .join('') || `<tr><td colspan="5" class="muted">${rows.length ? 'Tidak ada scan yang cocok dengan pencarian.' : 'Belum ada scan hari ini.'}</td></tr>`;
 }
 
-/** Status tiap karyawan hari ini. Terlambat = scan pertama lewat jam masuk + toleransi (sama dengan Rekap). */
-function build(list, day) {
+/**
+ * Status tiap karyawan hari ini. Terlambat = scan pertama lewat jam masuk + toleransi (sama dengan Rekap).
+ * `carried` (overnight): scan hari ini yang menjadi pulang dari masuk jam bebas kemarin, bukan masuk hari ini.
+ */
+function build(list, day, carried) {
   const holiday = data.holidays.find((h) => h.date === day);
-  const shift = (pin) => (holiday ? null : (scheduleOf(pin) ?? data.schedule).days[weekday(day)]);
   const scans = new Map(); // pin -> scan urut jam, {m, manual, verify, reason}
+  const back = new Map(); // pin -> menit pulang dari masuk kemarin
   for (const l of [...list].reverse()) {
-    scans.set(l.pin, [...(scans.get(l.pin) ?? []), { m: minutes(l.scan_date, 11), manual: !!l.manual, verify: l.verify, reason: l.reason }]);
+    if (carried.has(`${l.pin} ${l.scan_date}`)) back.set(l.pin, minutes(l.scan_date, 11));
+    else scans.set(l.pin, [...(scans.get(l.pin) ?? []), { m: minutes(l.scan_date, 11), manual: !!l.manual, verify: l.verify, reason: l.reason }]);
   }
   const leave = new Map(data.leaves.filter((l) => l.from <= day && day <= l.to).map((l) => [l.pin, l]));
   people = knownPins().filter(inRecap).map((pin) => {
-    const s = shift(pin);
+    const s = shiftOn(pin, day);
     const sc = scans.get(pin) ?? [];
     let kind;
     if (sc.length) kind = !s ? 'luar' : !s.free && sc[0].m > minutes(s.start) + data.schedule.tolerance ? 'telat' : 'tepat';
     else if (s) kind = leave.has(pin) ? 'izin' : 'belum';
     else return null; // tidak dijadwalkan dan tidak scan
-    return { pin, kind, shift: s, scans: sc, leave: leave.get(pin) };
+    return { pin, kind, shift: s, scans: sc, leave: leave.get(pin), back: back.get(pin) };
   }).filter(Boolean);
   const expected = people.filter((p) => p.shift).length;
   const came = people.filter((p) => p.shift && p.scans.length).length;
@@ -165,7 +172,7 @@ function render(fresh) {
 }
 
 /** Jam pulang: scan terakhir, bila cukup jauh dari scan pertama (lebih dekat = scan ganda; jam bebas: berapa pun). */
-const out = (p) => (p.scans.length > 1 && p.scans.at(-1).m - p.scans[0].m >= minGapOf(p.pin, today()) ? p.scans.at(-1) : null);
+const out = (p) => (p.scans.length > 1 && p.scans.at(-1).m - p.scans[0].m >= (p.shift?.free ? 0 : data.schedule.minGap) ? p.scans.at(-1) : null);
 const lateBy = (p) => p.scans[0].m - minutes(p.shift.start);
 
 function card(p, fresh) {
@@ -179,6 +186,7 @@ function card(p, fresh) {
   }[p.kind]();
   const ket = [
     out(p) && `pulang ${hhmm(out(p).m)}`,
+    p.back != null && `pulang ${hhmm(p.back)} dari masuk kemarin`,
     first?.manual && 'koreksi manual',
     p.kind === 'izin' && p.leave.note,
     p.kind === 'belum' && (p.shift.free ? 'jam bebas' : `jadwal masuk ${p.shift.start}`),
@@ -208,8 +216,9 @@ function person(pin) {
     `<div class="orang-kepala"><div class="foto-orang" data-pin="${esc(pin)}" title="Belum ada foto dari mesin">${NO_PHOTO}</div>` +
     `<div><p class="kartu-status ${p.kind}"><b>${esc(status)}</b></p>` +
     `<p class="muted">${scheduleTag(pin)} ${!p.shift ? 'Tidak ada jadwal kerja hari ini' : p.shift.free ? 'Hari ini jam bebas' : `Jadwal hari ini ${p.shift.start}–${p.shift.end}`}</p></div></div>` +
-    (p.scans.length
-      ? `<ul class="scan-list">${p.scans.map((s) => `<li><b>${hhmm(s.m)}</b><span>${esc(via(s))}</span></li>`).join('')}</ul>`
+    (p.scans.length || p.back != null
+      ? `<ul class="scan-list">${p.back != null ? `<li><b>${hhmm(p.back)}</b><span>pulang dari masuk kemarin (jam bebas)</span></li>` : ''}` +
+        `${p.scans.map((s) => `<li><b>${hhmm(s.m)}</b><span>${esc(via(s))}</span></li>`).join('')}</ul>`
       : '<p class="muted">Belum ada scan hari ini.</p>') +
     '<div class="tindakan">' +
     (p.leave ? '<button data-aksi="ubah-izin">Ubah catatan izin</button>' : '<button data-aksi="izin" class="utama">Catat izin, sakit, atau cuti</button>') +

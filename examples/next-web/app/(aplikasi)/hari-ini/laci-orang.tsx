@@ -77,8 +77,11 @@ function Isi({ p, day, onForm }: { p: Person; day: string; onForm: Props['onForm
           <p className="muted"><JadwalTag app={app} pin={p.pin} /> {shift}</p>
         </div>
       </div>
-      {p.scans.length ? (
+      {p.scans.length || p.back != null ? (
         <ul className="scan-list">
+          {p.back != null && (
+            <li><b>{hhmm(p.back)}</b><span>pulang dari masuk kemarin (jam bebas)</span></li>
+          )}
           {p.scans.map((s, i) => (
             <li key={i}><b>{hhmm(s.m)}</b><span>{via(s)}</span></li>
           ))}
