@@ -48,7 +48,7 @@ jobs:
         run: >-
           docker run --rm -v "$PWD/dist:/ff" alpine:3 sh -c
           '/ff/${{ matrix.asset }} --data /tmp/d & for i in $(seq 20); do wget -qO- http://127.0.0.1:8013/status.json && exit 0; sleep 0.5; done; exit 1'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.asset }}
           path: dist/*
@@ -79,7 +79,7 @@ jobs:
         run: sudo apt-get update -q && sudo apt-get install -yq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
       - if: matrix.target
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: npm ci
@@ -124,7 +124,7 @@ jobs:
           netsh advfirewall firewall show rule name=FreedomFingerApp | Out-Null
           if (-not $LASTEXITCODE) { throw "aturan firewall tidak dihapus saat uninstall" }
           exit 0
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ runner.os }}
           path: dist/*
@@ -134,7 +134,7 @@ jobs:
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
