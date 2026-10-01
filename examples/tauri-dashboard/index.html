@@ -485,7 +485,7 @@
       table.karyawan td.pin { color: var(--redup); }
       .di-mesin { display: block; font-size: 12px; color: var(--redup); padding: 0 10px; }
       /* jam kerja: kartu jadwal berdampingan */
-      .jadwal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; margin: 0 0 12px; }
+      .jadwal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(540px, 1fr)); gap: 14px; margin: 0 0 12px; }
       .jadwal-kartu > header { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; min-height: 32px; }
       .jadwal-kartu > header h3 { margin: 0; }
       .jadwal-kartu > header p { margin: 0; font-size: 12.5px; color: var(--redup); }
@@ -500,6 +500,10 @@
       .hari-kerja input[type="time"] { width: 86px; padding: 0 6px; }
       .hari-kerja .libur-teks { color: var(--redup); font-size: 13px; }
       .hari-kerja.off .rentang, .hari-kerja:not(.off) .libur-teks { display: none; }
+      .hari-kerja .bebas-pilih { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--redup); }
+      .hari-kerja .jam-isi { display: flex; align-items: center; gap: 6px; }
+      .hari-kerja.bebas .jam-isi { display: none; }
+      .hari-kerja.bebas [name^="ot"] { visibility: hidden; }
       .hari-kerja.off .nama-hari { color: var(--redup); }
       .hari-kerja input[name="otmax"] { width: 100%; padding: 0 6px; }
       .hari-kerja:not(:has(input[name="ot"]:checked)) input[name="otmax"] { visibility: hidden; }
@@ -777,7 +781,8 @@
             <div><h2>Jadwal</h2>
           <p class="muted kecil">Jadwal utama berlaku untuk semua karyawan, kecuali yang dipilihkan jadwal lain di menu Karyawan.
             Lembur dinyalakan per hari: di hari kerja dihitung setelah jam pulang, di hari libur seluruh jam kerja dihitung lembur.
-            Maks. jam = lembur paling lama hari itu; kosong berarti tanpa batas. Bulatan warna di samping nama jadwal = warna jadwal di Hari ini.</p></div>
+            Maks. jam = lembur paling lama hari itu; kosong berarti tanpa batas. Bebas = datang dan pulang kapan saja: hadir bila scan,
+            tanpa terlambat, pulang cepat, atau lembur. Bulatan warna di samping nama jadwal = warna jadwal di Hari ini.</p></div>
             <button id="p-jadwal-tambah" class="utama" title="Mis. paruh waktu atau shift"><i data-lucide="plus"></i>Tambah jadwal lain</button>
           </div>
           <div id="p-jadwal" class="jadwal-grid"></div>

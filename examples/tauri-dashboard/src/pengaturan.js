@@ -48,10 +48,11 @@ export function init() {
     }
     const q = (k) => tr.querySelector(`[name=${k}]`);
     // hari yang baru dijadikan hari kerja memakai jam hari kerja lain
-    const base = s.days.find(Boolean) ?? { start: '08:00', end: '17:00' };
+    const base = s.days.find((d) => d?.start) ?? { start: '08:00', end: '17:00' };
     const [start, end] = [q('start').value || base.start, q('end').value || base.end];
-    if (q('work').checked && start >= end) return notify(`${DAY_NAMES[tr.dataset.day]}: jam pulang harus setelah jam masuk.`, true);
-    s.days[tr.dataset.day] = q('work').checked ? { start, end } : null;
+    const free = q('free').checked;
+    if (q('work').checked && !free && start >= end) return notify(`${DAY_NAMES[tr.dataset.day]}: jam pulang harus setelah jam masuk.`, true);
+    s.days[tr.dataset.day] = !q('work').checked ? null : free ? { free: true } : { start, end };
     saveData();
     show();
   };
@@ -120,16 +121,18 @@ export function show(reason = 'open') {
   $('p-kantor').value = data.office;
   // warna jadwal: tanda jadwal di Hari ini
   const swatch = (s, label) => `<input type="color" name="warna" value="${colorOf(s)}" aria-label="Warna jadwal ${esc(label)}" title="Warna jadwal di Hari ini">`;
-  // satu kartu per jadwal; tiap hari: sakelar kerja, jam masuk–pulang (hari libur: tulisan Libur), sakelar lembur,
-  // dan lembur maksimal (tampil hanya bila lembur hari itu aktif)
+  // satu kartu per jadwal; tiap hari: sakelar kerja, jam masuk–pulang atau jam bebas (hari libur: tulisan Libur),
+  // sakelar lembur, dan lembur maksimal (tampil hanya bila lembur hari itu aktif; jam bebas tanpa lembur)
   const rows = (s, label) => '<div class="hari-kerja judul-kolom" aria-hidden="true"><span></span><span>Kerja</span><span>Jam kerja</span>' +
     '<span>Lembur</span><span>Maks. jam</span></div>' + ORDER.map((i) => {
     const d = s.days[i];
     const l = `${label} ${DAY_NAMES[i]}`;
-    return `<div class="hari-kerja${d ? '' : ' off'}" data-day="${i}"><span class="nama-hari">${DAY_NAMES[i]}</span>` +
+    return `<div class="hari-kerja${d ? '' : ' off'}${d?.free ? ' bebas' : ''}" data-day="${i}"><span class="nama-hari">${DAY_NAMES[i]}</span>` +
       `<input type="checkbox" class="saklar" name="work"${d ? ' checked' : ''} aria-label="${esc(l)} hari kerja">` +
-      `<span class="rentang"><input type="time" name="start" value="${d?.start ?? ''}" aria-label="${esc(l)} jam masuk"> – ` +
-      `<input type="time" name="end" value="${d?.end ?? ''}" aria-label="${esc(l)} jam pulang"></span><span class="libur-teks">Libur</span>` +
+      `<span class="rentang"><span class="jam-isi"><input type="time" name="start" value="${d?.start ?? ''}" aria-label="${esc(l)} jam masuk"> – ` +
+      `<input type="time" name="end" value="${d?.end ?? ''}" aria-label="${esc(l)} jam pulang"></span><label class="bebas-pilih" ` +
+      `title="Datang dan pulang kapan saja: tidak ada terlambat, pulang cepat, atau lembur"><input type="checkbox" name="free"${d?.free ? ' checked' : ''} aria-label="${esc(l)} jam bebas"> Bebas</label>` +
+      '</span><span class="libur-teks">Libur</span>' +
       `<input type="checkbox" class="saklar" name="ot"${s.overtime[i] ? ' checked' : ''} aria-label="${esc(l)} hitung lembur" ` +
       `title="${d ? 'Hitung lembur setelah jam pulang' : 'Kerja di hari libur ini seluruhnya dihitung lembur'}">` +
       `<input type="number" name="otmax" min="0.5" max="24" step="0.5" value="${s.overtimeMax[i] ? s.overtimeMax[i] / 60 : ''}" placeholder="bebas" ` +

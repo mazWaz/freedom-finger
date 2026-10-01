@@ -192,3 +192,11 @@ test('karyawan yang dihapus dari mesin: hari sesudah tanggal hapus tidak dihitun
   assert.deepEqual(r.days.map((d) => d.date), ['2026-09-01', '2026-09-02']);
   assert.equal(r.total.absent, 1); // 2 September: masih karyawan, tidak scan
 });
+
+test('jam bebas: hadir bila scan, tanpa scan = alpa; tidak ada terlambat, pulang cepat, atau lembur', () => {
+  const schedule = { ...DEFAULT_SCHEDULE, days: Array(7).fill({ free: true }) };
+  const d = day(['11:40', '23:00'], { schedule });
+  assert.deepEqual([d.status, d.late, d.early, d.overtime, d.hours, d.noOut], ['hadir', 0, 0, 0, hm(11, 20), false]);
+  assert.equal(day(['13:00'], { schedule }).noOut, true);
+  assert.equal(day([], { schedule }).status, 'alpa');
+});

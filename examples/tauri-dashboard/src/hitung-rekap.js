@@ -6,7 +6,8 @@
 // - hari ini dan sesudahnya belum dihitung
 // Semua jam dalam menit sejak 00:00; detik diabaikan.
 
-/** Nilai awal sampai aturan kantor diisi: Senin–Jumat 08:00–17:00. `days[0]` = Minggu; `null` = libur. */
+/** Nilai awal sampai aturan kantor diisi: Senin–Jumat 08:00–17:00. `days[0]` = Minggu; `null` = libur;
+ * `{free: true}` = jam bebas (hari kerja tanpa jam masuk/pulang). */
 export const DEFAULT_SCHEDULE = {
   days: [null, ...Array.from({ length: 5 }, () => ({ start: '08:00', end: '17:00' })), null],
   tolerance: 15, // menit terlambat yang masih tepat waktu
@@ -145,6 +146,8 @@ function day(date, scans, shift, s, leave, holiday) {
     d.hours = 0;
   } else if (first === undefined) {
     d.status = 'alpa';
+  } else if (shift.free) {
+    d.noOut = out === null; // jam bebas: tidak ada terlambat, pulang cepat, atau lembur
   } else {
     const start = minutes(shift.start);
     const end = minutes(shift.end);

@@ -124,7 +124,7 @@ function build(list, day) {
     const s = shift(pin);
     const sc = scans.get(pin) ?? [];
     let kind;
-    if (sc.length) kind = !s ? 'luar' : sc[0].m > minutes(s.start) + data.schedule.tolerance ? 'telat' : 'tepat';
+    if (sc.length) kind = !s ? 'luar' : !s.free && sc[0].m > minutes(s.start) + data.schedule.tolerance ? 'telat' : 'tepat';
     else if (s) kind = leave.has(pin) ? 'izin' : 'belum';
     else return null; // tidak dijadwalkan dan tidak scan
     return { pin, kind, shift: s, scans: sc, leave: leave.get(pin) };
@@ -172,7 +172,7 @@ function card(p, fresh) {
   const first = p.scans[0];
   const [jam, status] = {
     telat: () => [hhmm(first.m), `terlambat ${lateBy(p)} mnt`],
-    tepat: () => [hhmm(first.m), 'tepat waktu'],
+    tepat: () => [hhmm(first.m), p.shift.free ? 'jam bebas' : 'tepat waktu'],
     luar: () => [hhmm(first.m), 'di luar jadwal'],
     izin: () => [LABEL[p.leave.kind], ''],
     belum: () => ['belum datang', ''],
@@ -181,7 +181,7 @@ function card(p, fresh) {
     out(p) && `pulang ${hhmm(out(p).m)}`,
     first?.manual && 'koreksi manual',
     p.kind === 'izin' && p.leave.note,
-    p.kind === 'belum' && `jadwal masuk ${p.shift.start}`,
+    p.kind === 'belum' && (p.shift.free ? 'jam bebas' : `jadwal masuk ${p.shift.start}`),
   ].filter(Boolean).join(', ');
   return `<button class="kartu ${p.kind}${fresh ? ' baru' : ''}" data-pin="${esc(p.pin)}" ` +
     `aria-label="${esc(nameOf(p.pin))}: ${esc([jam, status, ket, data.schedules.length && `jadwal ${scheduleName(p.pin)}`].filter(Boolean).join(', '))}. ` +
@@ -198,7 +198,7 @@ function person(pin) {
   const day = today();
   const status = {
     telat: () => `Terlambat ${lateBy(p)} menit`,
-    tepat: () => 'Datang tepat waktu',
+    tepat: () => (p.shift.free ? 'Sudah datang' : 'Datang tepat waktu'),
     luar: () => 'Absen di luar jadwal kerjanya',
     izin: () => `${LABEL[p.leave.kind]} ${period(p.leave.from, p.leave.to)}${p.leave.note ? `: ${p.leave.note}` : ''}`,
     belum: () => 'Belum datang',
@@ -207,7 +207,7 @@ function person(pin) {
   $('laci-orang').innerHTML =
     `<div class="orang-kepala"><div class="foto-orang" data-pin="${esc(pin)}" title="Belum ada foto dari mesin">${NO_PHOTO}</div>` +
     `<div><p class="kartu-status ${p.kind}"><b>${esc(status)}</b></p>` +
-    `<p class="muted">${scheduleTag(pin)} ${p.shift ? `Jadwal hari ini ${p.shift.start}–${p.shift.end}` : 'Tidak ada jadwal kerja hari ini'}</p></div></div>` +
+    `<p class="muted">${scheduleTag(pin)} ${!p.shift ? 'Tidak ada jadwal kerja hari ini' : p.shift.free ? 'Hari ini jam bebas' : `Jadwal hari ini ${p.shift.start}–${p.shift.end}`}</p></div></div>` +
     (p.scans.length
       ? `<ul class="scan-list">${p.scans.map((s) => `<li><b>${hhmm(s.m)}</b><span>${esc(via(s))}</span></li>`).join('')}</ul>`
       : '<p class="muted">Belum ada scan hari ini.</p>') +
@@ -264,7 +264,7 @@ function ribbon(scans, day, late) {
   $('pita-kosong').hidden = !!scans.size;
   const shifts = data.holidays.some((h) => h.date === day) ? [] : [{ ...data.schedule, name: 'Utama' }, ...data.schedules]
     // warna jadwal hanya bila ada jadwal lain; satu jadwal saja = hijau seperti biasa
-    .filter((s) => s.days[weekday(day)]).map((s) => ({ name: s.name, color: data.schedules.length ? colorOf(s) : 'var(--hijau)', ...s.days[weekday(day)] }));
+    .filter((s) => s.days[weekday(day)]?.start).map((s) => ({ name: s.name, color: data.schedules.length ? colorOf(s) : 'var(--hijau)', ...s.days[weekday(day)] }));
   const starts = [...new Set(shifts.map((s) => s.start))];
   const all = [...scans.values()].flat();
   const now = new Date().getHours() * 60 + new Date().getMinutes();
