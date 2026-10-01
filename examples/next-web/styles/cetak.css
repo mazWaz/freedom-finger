@@ -1,0 +1,25 @@
+/* Layar sempit dan tampilan cetak; dimuat terakhir supaya menimpa aturan sebelumnya. */
+
+@media (max-width: 760px) {
+  .aplikasi { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .samping { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--garis); }
+  .merek { padding: 0; } .samping nav { flex-direction: row; flex-wrap: wrap; } .kelompok { display: none; }
+  .kaki { margin: 0 0 0 auto; padding: 0; display: flex; gap: 10px; align-items: center; }
+  main > section { padding: 20px 16px 40px; }
+}
+@media (prefers-reduced-motion: reduce) { tr.baru, .kartu.baru { animation: none; } }
+
+.print-title { display: none; }
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  #r-daftar tr.luar { display: table-row; }
+  :root { --kertas: #fff; --muka: #fff; --tinta: #000; --redup: #444; --garis: #bbb; }
+  body { font-size: 10px; }
+  .aplikasi { display: block; } main { overflow: visible; } main > section { padding: 0; max-width: none; }
+  .samping, .kepala, .controls, .no-print, #pesan, .masuk { display: none !important; }
+  .print-title { display: block; font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+  table { font-size: 10px; } th, td { padding: 3px 4px; } tr { break-inside: avoid; }
+  thead th { position: static; }
+  .matriks-bungkus { max-height: none; overflow: visible; border: 0; } .matriks th:first-child { position: static; }
+  .matriks td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

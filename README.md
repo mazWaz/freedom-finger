@@ -162,6 +162,7 @@ curl -s http://localhost:8013/api/get_attlog -H "Authorization: Bearer $TOKEN" \
 | [`docs/openapi.yaml`](docs/openapi.yaml) | Spesifikasi OpenAPI 3.1, untuk Swagger UI atau generator klien |
 | [`examples/tauri-dashboard`](examples/tauri-dashboard) | Kode aplikasi desktop: contoh menanam server di aplikasi Rust dan memakai API-nya |
 | [`examples/bun-web`](examples/bun-web) | Aplikasi yang sama sebagai halaman web dengan login user, servernya Bun: contoh memakai API dari server lain |
+| [`examples/next-web`](examples/next-web) | Aplikasi web yang sama dengan Next.js (React): contoh route handler, server action, dan login di Next.js |
 
 ## Commands
 
@@ -179,6 +180,7 @@ curl -s http://localhost:8013/api/get_attlog -H "Authorization: Bearer $TOKEN" \
 | `crates/freedom-finger-sdk` | SDK: protokol FkWeb (mode Internet), tanpa I/O |
 | `examples/tauri-dashboard` | Aplikasi desktop untuk pengguna, sekaligus contoh dan demo: server tertanam, riwayat, rekap, export, backup |
 | `examples/bun-web` | Versi web untuk server kantor yang menyala terus: tampilan sama dengan desktop, login user dan kata sandi |
+| `examples/next-web` | Versi web yang sama dengan Next.js: komponen React, login user dan kata sandi |
 
 ## Build and test
 

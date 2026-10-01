@@ -97,3 +97,21 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun test
       - run: bun run check
+
+  # Contoh web (Next.js): uji login, sesi, dan aturan rekap; tipe TypeScript; build produksi.
+  next-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/next-web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: examples/next-web/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+      - run: npm run build
