@@ -1,0 +1,7 @@
+*
+!package.json
+!bun.lock
+!server
+!web
+server/*.test.ts
+web/**/*.test.js

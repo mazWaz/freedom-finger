@@ -181,6 +181,7 @@ curl -s http://localhost:8013/api/get_attlog -H "Authorization: Bearer $TOKEN" \
 | `examples/tauri-dashboard` | Aplikasi desktop untuk pengguna, sekaligus contoh dan demo: server tertanam, riwayat, rekap, export, backup |
 | `examples/bun-web` | Versi web untuk server kantor yang menyala terus: tampilan sama dengan desktop, login user dan kata sandi |
 | `examples/next-web` | Versi web yang sama dengan Next.js: komponen React, login user dan kata sandi |
+| `docker` | Image Docker program server (file rilis Linux, ±7 MB), dipakai `compose.yaml` contoh web |
 
 ## Build and test
 

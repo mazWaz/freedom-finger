@@ -1,0 +1,34 @@
+# docker compose up -d --build   (isi FREEDOM_FINGER_TOKEN di .env lebih dulu, lihat README)
+# Dua layanan: server Freedom Finger (menerima absen dari mesin di port 8013) dan halaman web.
+# Server Freedom Finger sudah dipasang langsung (freedom-finger install)? Jalankan halaman web saja:
+#   docker compose up -d --build web
+services:
+  freedom-finger:
+    build: ../../docker
+    image: freedom-finger
+    restart: unless-stopped
+    # jaringan komputer ini (server Linux): mesin mengirim ke port 8013-nya, Server IP di layar status
+    # benar, dan Cari mesin memindai jaringan kantor
+    network_mode: host
+    environment:
+      FKWEB_TOKEN: ${FREEDOM_FINGER_TOKEN:?isi FREEDOM_FINGER_TOKEN di .env}
+    volumes:
+      - server:/data
+
+  web:
+    build: .
+    image: freedom-finger-next-web
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      FREEDOM_FINGER_URL: http://host.docker.internal:8013
+      FREEDOM_FINGER_TOKEN: ${FREEDOM_FINGER_TOKEN:?isi FREEDOM_FINGER_TOKEN di .env}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - data:/data
+
+volumes:
+  data: # aplikasi.json dan users.json
+  server: # database absen (berisi data jari/wajah) dan foto

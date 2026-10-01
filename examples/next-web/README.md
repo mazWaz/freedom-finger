@@ -64,6 +64,39 @@ dipakai (hash kata sandinya berbeda): buat user lagi.
 Lupa semua kata sandi: hentikan server web, hapus `DATA_DIR/users.json`, nyalakan lagi, lalu buat
 user pertama lagi. Data absen dan aplikasi tidak ikut terhapus.
 
+## Docker
+
+Cara paling ringkas untuk server kantor Linux: satu perintah menjalankan **server Freedom Finger**
+(menerima absen dari mesin di port 8013) dan **halaman web** (port 3000), tanpa memasang Node.js
+atau program server di komputer itu.
+
+```sh
+cd examples/next-web
+cp .env.example .env     # isi FREEDOM_FINGER_TOKEN dengan teks acak, mis. hasil `openssl rand -hex 24`
+docker compose up -d --build
+```
+
+Lalu isi menu mesin dengan IP server dan port 8013 (lihat `http://<IP server>:8013`), dan buka
+halaman web di `http://<IP server>:3000`. Keduanya hidup lagi sendiri setelah komputer dinyalakan ulang.
+
+Server Freedom Finger sudah dipasang langsung dengan `freedom-finger install`, atau komputernya Mac atau
+Windows? Jalankan halaman web saja, dengan `FREEDOM_FINGER_TOKEN` diisi `FKWEB_TOKEN` dari
+`freedom-finger.env`:
+
+```sh
+docker compose up -d --build web
+```
+
+| Hal | Isi |
+|---|---|
+| Image server | File rilis Linux `freedom-finger` (statis; SDK, SQLite, zona waktu sudah di dalamnya) di image kosong: ±7 MB ([`docker/Dockerfile`](../../docker/Dockerfile)). Versi tertentu: ubah `build` menjadi `{context: ../../docker, args: {VERSION: v0.5.0}}` |
+| Image web | output `standalone` Next.js dan binary Node di Alpine, tanpa npm dan tanpa sharp; unduhan ±58 MB, di disk ±162 MB |
+| Jaringan | Server memakai jaringan komputer itu (`network_mode: host`): mesin mengirim ke port 8013-nya, IP di layar status benar, dan Cari mesin memindai jaringan kantor. Ini hanya penuh di Linux; di Docker Desktop (Mac, Windows) pasang server langsung. Halaman web menghubungi server lewat `host.docker.internal:8013` |
+| Port web | Bawaan 3000; port lain: `PORT=8080 docker compose up -d` |
+| Data | Volume `server` (database absen, berisi data jari/wajah) dan `data` (`aplikasi.json`, `users.json`) |
+| Backup | `docker compose exec freedom-finger /freedom-finger --data /data backup /data/backup.db`, lalu `docker compose cp freedom-finger:/data/backup.db .`; data web: `docker compose cp web:/data ./backup-web` |
+| Update | Web: ambil kode baru (`git pull`), lalu `docker compose up -d --build`. Server ke rilis terbaru: `docker compose build --no-cache freedom-finger && docker compose up -d` |
+
 ## Security
 
 - Token API hanya ada di server web. Browser memanggil `/api/ff/<endpoint>` dan server web

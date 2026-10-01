@@ -3,7 +3,6 @@
 import {
   CalendarCheck, CalendarX, Clock, FilePenLine, FingerprintPattern, History, LogOut, Settings, Sheet, Users, type LucideIcon,
 } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from '@/lib/server/actions';
@@ -32,7 +31,7 @@ export function Samping() {
   return (
     <aside className="samping">
       <div className="merek">
-        <Image src="/logo.png" alt="" width={30} height={30} />
+        <img src="/logo.png" alt="" width={30} height={30} />
         <div>
           <b>Freedom Finger</b>
           <span id="status-samping" role="status" className={!devices.length ? 'redup' : on === devices.length ? 'ok' : 'off'}>
