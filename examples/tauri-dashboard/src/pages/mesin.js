@@ -6,7 +6,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { Check, createElement } from 'lucide';
-import { $, MACHINE_ICON, api, call, closeDrawer, data, devices, dmy, esc, loadDevices, notify, openDrawer, port, saveData, users, waiting } from './app.js';
+import { api, call, devices, loadDevices, port, users } from '../lib/api.js';
+import { data, saveData } from '../lib/data.js';
+import { dmy } from '../lib/format.js';
+import { $, MACHINE_ICON, closeDrawer, esc, notify, openDrawer, waiting } from '../lib/ui.js';
 
 const ACTIONS = {
   set_time: { label: 'Setel jam sekarang', done: () => 'jam mesin sudah disetel' },

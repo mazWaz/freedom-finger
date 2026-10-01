@@ -4,7 +4,8 @@
 // backup) tetap berjalan.
 // ponytail: hanya mengunci tampilan; orang yang bisa membuka folder data aplikasi tetap bisa membaca
 // datanya atau menghapus "auth" di aplikasi.json (itu juga jalan keluar bila lupa kata sandi).
-import { $, closeDrawer, data, notify, saveData } from './app.js';
+import { data, saveData } from '../lib/data.js';
+import { $, closeDrawer, notify } from '../lib/ui.js';
 
 const ITERATIONS = 310_000;
 const MIN_LENGTH = 6;

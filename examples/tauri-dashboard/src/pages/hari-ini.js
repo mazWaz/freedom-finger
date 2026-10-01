@@ -5,11 +5,11 @@
 // Koreksi absen hari ini ikut dihitung seperti scan, sama dengan Rekap.
 import { invoke } from '@tauri-apps/api/core';
 import { FingerprintPattern, createElement } from 'lucide';
-import {
-  $, backups, colorOf, data, dayName, deptOf, devices, esc, hhmm, inRecap, knownPins, logs, monthName, nameOf, openDrawer, paginate, period, port,
-  scheduleName, scheduleOf, scheduleTag, today,
-} from './app.js';
-import { correctionScans, minutes, scanRoles, userPhoto, weekday } from './hitung-rekap.js';
+import { backups, devices, logs, port } from '../lib/api.js';
+import { colorOf, data, deptOf, inRecap, knownPins, nameOf, scheduleName, scheduleOf, scheduleTag } from '../lib/data.js';
+import { dayName, hhmm, monthName, period, today } from '../lib/format.js';
+import { correctionScans, minutes, scanRoles, userPhoto, weekday } from '../lib/hitung-rekap.js';
+import { $, esc, openDrawer, paginate } from '../lib/ui.js';
 import { openForm } from './izin.js';
 import { LABEL } from './rekap.js';
 

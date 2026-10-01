@@ -8,11 +8,11 @@
 // cadangan itu. set_userinfo mengganti SELURUH data user: untuk orang yang sudah ada selalu kirim template.
 import { ask } from '@tauri-apps/plugin-dialog';
 import { createElement } from 'lucide';
-import {
-  $, MACHINE_ICON, backups, byPin, call, closeDrawer, command, data, devices, esc, isRemoved, knownPins, loadUsers, longDate, machineName, nameOf,
-  notify, openDrawer, saveData, today, usedPins, users, waiting,
-} from './app.js';
-import { enrolled } from './hitung-rekap.js';
+import { backups, call, command, devices, loadUsers, machineName, users } from '../lib/api.js';
+import { byPin, data, isRemoved, knownPins, nameOf, saveData, usedPins } from '../lib/data.js';
+import { longDate, today } from '../lib/format.js';
+import { enrolled } from '../lib/hitung-rekap.js';
+import { $, MACHINE_ICON, closeDrawer, esc, notify, openDrawer, waiting } from '../lib/ui.js';
 import { REJECT } from './mesin.js';
 
 const PASSWORD = 10; // backup_number: jari 0-9, password 10, kartu 11, wajah 12

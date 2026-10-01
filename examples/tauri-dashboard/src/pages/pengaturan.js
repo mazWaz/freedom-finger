@@ -3,10 +3,11 @@
 // dipakai rekap.
 import { invoke } from '@tauri-apps/api/core';
 import { ask, open } from '@tauri-apps/plugin-dialog';
-import {
-  $, DAY_NAMES, SCHEDULE_COLORS, closeDrawer, colorOf, data, dayName, dmy, esc, monthName, notify, openDrawer, port, saveData, today,
-} from './app.js';
-import { DEFAULT_SCHEDULE, addDays } from './hitung-rekap.js';
+import { port } from '../lib/api.js';
+import { SCHEDULE_COLORS, colorOf, data, saveData } from '../lib/data.js';
+import { DAY_NAMES, dayName, dmy, monthName, today } from '../lib/format.js';
+import { DEFAULT_SCHEDULE, addDays } from '../lib/hitung-rekap.js';
+import { $, closeDrawer, esc, notify, openDrawer } from '../lib/ui.js';
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Senin dulu
 const NUMBERS = { tolerance: 'p-toleransi', overtimeMin: 'p-lembur', minGap: 'p-jarak' };

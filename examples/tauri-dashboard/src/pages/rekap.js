@@ -1,10 +1,11 @@
 // Tab Rekap: satu baris per karyawan untuk satu bulan (atau rentang), klik untuk rincian per hari.
 // Hitungannya di hitung-rekap.js; tab ini hanya mengambil scan, menampilkan, dan meng-export.
-import {
-  $, byPin, data, dayName, deptOf, dmy, duration, esc, exportCsv, exportXlsx, firstScans, hhmm, inRecap, isRemoved, knownPins, lastMonths,
-  logs, longDate, monthName, monthRange, nameOf, print, reportTitle, scheduleName, scheduleOf, today,
-} from './app.js';
-import { LEAVE_KINDS, addDays, correctionScans, recap } from './hitung-rekap.js';
+import { firstScans, logs } from '../lib/api.js';
+import { byPin, data, deptOf, inRecap, isRemoved, knownPins, nameOf, scheduleName, scheduleOf } from '../lib/data.js';
+import { exportCsv, exportXlsx, print, reportTitle } from '../lib/export.js';
+import { dayName, dmy, duration, hhmm, lastMonths, longDate, monthName, monthRange, today } from '../lib/format.js';
+import { LEAVE_KINDS, addDays, correctionScans, recap } from '../lib/hitung-rekap.js';
+import { $, esc } from '../lib/ui.js';
 import { openForm } from './izin.js';
 import { CalendarClock, Clock, createElement } from 'lucide';
 

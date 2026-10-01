@@ -5,8 +5,9 @@
 // dengan `data-sampai="<id input sampai>"`, dengan rentang cepat (1 minggu, 1 bulan, …); `change`-nya
 // dikirim sekali, di input dari.
 import { Calendar, ChevronLeft, ChevronRight, createElement } from 'lucide';
-import { $, longDate, monthName, ranges, today } from './app.js';
-import { addDays, addMonths, weekday } from './hitung-rekap.js';
+import { longDate, monthName, ranges, today } from '../lib/format.js';
+import { addDays, addMonths, weekday } from '../lib/hitung-rekap.js';
+import { $ } from '../lib/ui.js';
 
 const HEAD = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 const STEP = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };

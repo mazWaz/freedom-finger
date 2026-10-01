@@ -1,6 +1,6 @@
-// Aplikasi absensi. Server Freedom Finger berjalan di dalam aplikasi ini (src-tauri/src/main.rs);
-// halaman memakai API HTTP-nya (docs/api.md) seperti aplikasi lain. Satu modul per tab; yang
-// dipakai bersama ada di app.js, dan aturan rekap di hitung-rekap.js.
+// Aplikasi absensi. Server Freedom Finger berjalan di dalam aplikasi ini (src-tauri/src/lib.rs);
+// halaman memakai API HTTP-nya (docs/api.md) seperti aplikasi lain. Satu modul per menu di pages/,
+// bagian layar bersama di components/, kode bersama di lib/ (aturan rekap: lib/hitung-rekap.js).
 // PC tidak menyala 24 jam: saat start, semua log mesin ditarik (sync_attlog) untuk menyusul absen
 // selama PC mati, karena antrean kiriman mesin sendiri masuk pelan.
 // Tampilan terkunci sampai kata sandi benar (kunci.js); tugas latar tetap berjalan.
@@ -13,18 +13,18 @@ import {
   Printer, Settings, Sheet, UserPlus, Users,
   createIcons,
 } from 'lucide';
-import {
-  $, api, bus, closeDrawer, connect, data, devices, emit, listen, loadData, loadDevices, loadFirstScans, loadUsers, noteScan, notify, waiting,
-} from './app.js';
-import * as hariIni from './hari-ini.js';
-import * as izin from './izin.js';
-import * as karyawan from './karyawan.js';
-import * as kunci from './kunci.js';
-import * as mesin from './mesin.js';
-import * as pengaturan from './pengaturan.js';
-import * as rekap from './rekap.js';
-import * as riwayat from './riwayat.js';
-import * as tanggal from './tanggal.js';
+import * as kunci from './components/kunci.js';
+import * as tanggal from './components/tanggal.js';
+import { api, bus, connect, devices, emit, listen, loadDevices, loadFirstScans, loadUsers, noteScan } from './lib/api.js';
+import { data, loadData } from './lib/data.js';
+import { $, closeDrawer, notify, waiting } from './lib/ui.js';
+import * as hariIni from './pages/hari-ini.js';
+import * as izin from './pages/izin.js';
+import * as karyawan from './pages/karyawan.js';
+import * as mesin from './pages/mesin.js';
+import * as pengaturan from './pages/pengaturan.js';
+import * as rekap from './pages/rekap.js';
+import * as riwayat from './pages/riwayat.js';
 
 // Jam kerja, Hari libur, dan Backup ditangani pengaturan.js bersama Pengaturan (satu modul, empat menu)
 const TABS = { 'hari-ini': hariIni, riwayat, rekap, izin, karyawan, 'jam-kerja': pengaturan, libur: pengaturan, mesin, backup: pengaturan, pengaturan };

@@ -4,8 +4,10 @@
 // Form-nya ada di laci (panel samping) dan bisa dibuka dari tab lain lewat `openForm`, sudah terisi
 // nama dan tanggal (mis. dari kartu karyawan di Hari ini).
 import { ask } from '@tauri-apps/plugin-dialog';
-import { $, byPin, closeDrawer, data, dmy, esc, knownPins, nameOf, notify, openDrawer, paginate, period, saveData, today } from './app.js';
-import { LEAVE_KINDS } from './hitung-rekap.js';
+import { byPin, data, knownPins, nameOf, saveData } from '../lib/data.js';
+import { dmy, period, today } from '../lib/format.js';
+import { LEAVE_KINDS } from '../lib/hitung-rekap.js';
+import { $, closeDrawer, esc, notify, openDrawer, paginate } from '../lib/ui.js';
 import { LABEL } from './rekap.js';
 
 const FORMS = { leaves: 'i-izin', corrections: 'i-koreksi' }; // daftar di `data` -> form; tabelnya `<form>-daftar`

@@ -24,7 +24,7 @@ rekap bulanan, izin dan koreksi absen, perawatan mesin, export Excel, backup) da
 Aturan rekap: karyawan dihitung mulai hari pertama ada (scan pertama, ditambahkan lewat aplikasi, izin, atau koreksi), jadi karyawan baru tidak alpa sebelum mulai; scan pertama = masuk, scan terakhir = pulang bila minimal 60 menit sesudahnya
 (tombol Masuk/Pulang di mesin diabaikan); menit terlambat dihitung dari jam masuk; hari ini
 belum dihitung; hari dengan izin/sakit/cuti/dinas bukan alpa; koreksi manual dihitung seperti scan. Semua aturan
-ada di `src/hitung-rekap.js` dan diuji dengan `npm test`.
+ada di `src/lib/hitung-rekap.js` dan diuji dengan `npm test`.
 
 ## Behavior
 
@@ -76,14 +76,34 @@ Port 8013 sudah dipakai (misalnya layanan `freedom-finger install`)? Jalankan de
 `FKWEB_PORT=8014 npm run tauri dev`, lalu `FKWEB_PORT=8014 npm run simulasi`. Mode dev tidak
 mendaftarkan autostart. Installer dibuat oleh `.github/workflows/release.yml` (job `app`).
 
+Struktur folder mengikuti template resmi Tauri v2: halaman (Vite, JavaScript tanpa framework) di
+`src/`, sisi Rust di `src-tauri/`.
+
+```text
+index.html                 kerangka halaman: sidebar dan isi semua menu
+src/
+├── main.js                mulai: tunggu server, event realtime, sync_attlog saat start, pindah menu
+├── styles.css             tampilan, termasuk tampilan cetak (@media print)
+├── pages/                 satu file per menu di sidebar
+├── components/            bagian layar yang dipakai banyak menu: tanggal.js, kunci.js
+└── lib/                   kode bersama tanpa tampilan sendiri
+    ├── api.js             server: fetch ke API, perintah ke mesin, event realtime, mesin/user/log
+    ├── data.js            aplikasi.json dan data karyawan (nama, bagian, jadwal)
+    ├── format.js          tanggal dan jam untuk tampilan, rentang cepat
+    ├── ui.js              $, esc, pesan, laci (modal), layar tunggu, halaman tabel
+    ├── export.js          export .xlsx/CSV dan cetak
+    └── hitung-rekap.js    aturan rekap, fungsi murni tanpa DOM (+ .test.js, npm test)
+src-tauri/
+├── src/main.rs            titik masuk, hanya memanggil lib.rs
+├── src/lib.rs             rakit aplikasi: server tertanam, tray, autostart, satu instans, ukuran jendela
+└── src/commands/          perintah untuk halaman (invoke), satu file per topik:
+                           server, data (aplikasi.json), export, backup (+ pulihkan), update
+```
+
 | File | Isi |
 |---|---|
-| `src-tauri/src/main.rs` | Server tertanam, tray, autostart, satu instans; perintah untuk halaman: `aplikasi.json`, export .xlsx/CSV, backup, pulihkan, cetak |
-| `src/main.js` | Mulai: tunggu server, event realtime, `sync_attlog` saat start, backup otomatis, pindah tab |
-| `src/app.js` | Bersama: `fetch` ke API, `get_users` untuk nama, `aplikasi.json`, tanggal dan rentang cepat, halaman (`paginate`), export |
-| `src/tanggal.js` | Pemilih tanggal dan rentang untuk semua `<input type="date">`: tampil "1 Januari 2026" dengan kalender berbahasa Indonesia, apa pun bahasa OS |
-| `src/kunci.js` | Layar kunci dan kata sandi (hash PBKDF2 lewat WebCrypto, disimpan di `aplikasi.json`) |
-| `src/hitung-rekap.js` | Aturan rekap, fungsi murni tanpa DOM; diuji `src/hitung-rekap.test.js` (`npm test`) |
-| `src/hari-ini.js`, `riwayat.js`, `rekap.js`, `izin.js`, `karyawan.js`, `mesin.js`, `pengaturan.js` | Satu modul per tab; `pengaturan.js` melayani Jam kerja, Hari libur, Backup, dan Pengaturan. `karyawan.js`: `get_all_pin` lalu `get_userinfo` per PIN baru, berlanjut walau aplikasi ditutup |
+| `src/pages/*.js` | `hari-ini`, `riwayat`, `rekap`, `izin`, `karyawan`, `mesin`, `pengaturan`. `pengaturan.js` melayani Jam kerja, Hari libur, Backup, dan Pengaturan. `karyawan.js`: `get_all_pin` lalu `get_userinfo` per PIN baru, berlanjut walau aplikasi ditutup |
+| `src/components/tanggal.js` | Pemilih tanggal dan rentang untuk semua `<input type="date">`: tampil "1 Januari 2026" dengan kalender berbahasa Indonesia, apa pun bahasa OS |
+| `src/components/kunci.js` | Layar kunci dan kata sandi (hash PBKDF2 lewat WebCrypto, disimpan di `aplikasi.json`) |
 | `src-tauri/windows/hooks.nsh` | Aturan firewall saat install dan uninstall di Windows |
 | `simulasi.mjs` | Mesin tiruan untuk developer: satu absen FkWeb ke server |

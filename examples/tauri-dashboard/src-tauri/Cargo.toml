@@ -9,6 +9,11 @@ license = "MIT OR Apache-2.0"
 # Contoh berdiri sendiri, bukan bagian workspace root.
 [workspace]
 
+# Pola template Tauri v2: kode aplikasi di src/lib.rs, src/main.rs hanya memanggil `run()`.
+# Akhiran _lib supaya nama library tidak bentrok dengan nama program di Windows.
+[lib]
+name = "freedom_finger_tauri_dashboard_lib"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
