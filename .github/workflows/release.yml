@@ -28,7 +28,7 @@ jobs:
       # Windows: CRT statis, supaya jalan di PC bersih tanpa Visual C++ Redistributable
       RUSTFLAGS: ${{ matrix.target == 'x86_64-pc-windows-msvc' && '-C target-feature=+crt-static' || '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - if: contains(matrix.target, 'musl')
         run: sudo apt-get update -q && sudo apt-get install -yq musl-tools
       - run: rustup target add ${{ matrix.target }}
@@ -74,7 +74,7 @@ jobs:
         shell: bash
         working-directory: examples/tauri-dashboard
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - if: runner.os == 'Linux'
         run: sudo apt-get update -q && sudo apt-get install -yq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
       - if: matrix.target
